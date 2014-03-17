@@ -556,7 +556,7 @@ static void ttm_bo_cleanup_memtype_use(struct ttm_buffer_object *bo)
 	 *
 	 * This function only needs protection against the final kref_put.
 	 */
-	smp_mb__before_atomic_dec();
+	smp_mb__before_atomic();
 }
 
 static void ttm_bo_cleanup_refs_or_queue(struct ttm_buffer_object *bo)

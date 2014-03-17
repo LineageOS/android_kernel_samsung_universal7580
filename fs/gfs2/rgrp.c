@@ -610,7 +610,7 @@ static void __rs_deltree(struct gfs2_blkreserv *rs)
 		rs->rs_rbm.rgd->rd_reserved -= rs->rs_free;
 		rs->rs_free = 0;
 		clear_bit(GBF_FULL, &rs->rs_rbm.bi->bi_flags);
-		smp_mb__after_clear_bit();
+		smp_mb__after_atomic();
 	}
 }
 
