@@ -171,7 +171,7 @@ static void flip_cover_work(struct work_struct *work)
 
 	if(first == second) {
 		flip_cover = first;
-		input_report_switch(ddata->input, SW_FLIP, flip_cover);
+		input_report_switch(ddata->input, SW_LID, flip_cover);
 		input_sync(ddata->input);
 	}
 }
@@ -204,7 +204,7 @@ static void flip_cover_work(struct work_struct *work)
 #endif
 	flip_cover = first;
 	input_report_switch(ddata->input,
-			SW_FLIP, flip_cover);
+			SW_LID, flip_cover);
 	input_sync(ddata->input);
 }
 #endif
@@ -361,7 +361,7 @@ static int hall_probe(struct platform_device *pdev)
 	input->dev.parent = &pdev->dev;
 
 	input->evbit[0] |= BIT_MASK(EV_SW);
-	input_set_capability(input, EV_SW, SW_FLIP);
+	input_set_capability(input, EV_SW, SW_LID);
 
 	input->open = hall_open;
 	input->close = hall_close;
@@ -474,7 +474,7 @@ static int hall_resume(struct device *dev)
 	struct input_dev *input = ddata->input;
 
 	printk("%s start\n", __func__);
-	input_report_switch(ddata->input, SW_FLIP,
+	input_report_switch(ddata->input, SW_LID,
 			gpio_get_value_cansleep(ddata->gpio_flip_cover));
 	input_sync(input);
 #ifdef CONFIG_SENSORS_HALL_IRQ_CTRL
