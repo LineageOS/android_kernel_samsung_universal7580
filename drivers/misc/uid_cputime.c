@@ -100,6 +100,7 @@ static int uid_stat_show(struct seq_file *m, void *v)
 				task_uid(task)));
 			return -ENOMEM;
 		}
+
 		task_cputime_adjusted(task, &utime, &stime);
 		uid_entry->active_utime += utime;
 		uid_entry->active_stime += stime;
@@ -211,6 +212,7 @@ static int process_notifier(struct notifier_block *self,
 	uid_entry->utime += utime;
 	uid_entry->stime += stime;
 	uid_entry->power += task->cpu_power;
+	task->cpu_power = ULLONG_MAX;
 
 exit:
 	mutex_unlock(&uid_lock);
