@@ -304,17 +304,18 @@ int proc_fd_permission(struct inode *inode, int mask)
 {
 	struct task_struct *p;
 	int rv;
-	
+
 	rv = generic_permission(inode, mask);
 	if (rv == 0)
 		return rv;
-	
+
 	rcu_read_lock();
 	p = pid_task(proc_pid(inode), PIDTYPE_PID);
+	
 	if (p && same_thread_group(p, current))
 		rv = 0;
-	rcu_read_unlock();
 	
+	rcu_read_unlock();
 	return rv;
 }
 
