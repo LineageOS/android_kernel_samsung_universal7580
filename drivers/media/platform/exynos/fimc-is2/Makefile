@@ -33,7 +33,7 @@ obj-$(CONFIG_VIDEO_EXYNOS_FIMC_IS) += fimc-is.o
 obj-$(CONFIG_VIDEO_EXYNOS_FIMC_IS) += sensor/
 obj-$(CONFIG_VIDEO_EXYNOS_FIMC_IS) += ischain/
 obj-$(CONFIG_VIDEO_EXYNOS_FIMC_IS) += vendor/
-obj-$(CONFIG_USE_HOST_FD_LIBRARY) += hardware/api/fimc-is-api-fd.o
+obj-$(CONFIG_USE_HOST_FD_LIBRARY) += hardware/api/
 
 EXTRA_CFLAGS += -Idrivers/media/platform/exynos/fimc-is2
 EXTRA_CFLAGS += -Idrivers/media/platform/exynos/fimc-is2/include
