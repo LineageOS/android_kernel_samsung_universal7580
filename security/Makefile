@@ -33,7 +33,7 @@ obj-$(CONFIG_INTEGRITY)			+= integrity/built-in.o
 obj-$(CONFIG_MST_LDO)	  += mstdrv/
 
 # TIMA uevent 
-obj-$(CONFIG_TIMA)     += tima_uevent/tima_uevent.o
+obj-$(CONFIG_TIMA)     += tima_uevent/
 #ICCC
 obj-$(CONFIG_TZ_ICCC)	  += tz_iccc/
 
