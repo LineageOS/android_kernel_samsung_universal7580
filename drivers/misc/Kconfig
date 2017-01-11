@@ -554,14 +554,15 @@ config TIMA_LOG
 	default y
 	help
 	  This option enables support for dumping TIMA log.
-	  
-config UID_CPUTIME
-	tristate "Per-UID cpu time statistics"
+
+config UID_SYS_STATS
+	tristate "Per-UID statistics"
 	depends on PROFILING
 	default y
 	help
 	  Per UID based cpu time statistics exported to /proc/uid_cputime
-	
+	  Per UID based io statistics exported to /proc/uid_io
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
