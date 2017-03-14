@@ -1937,7 +1937,8 @@ restart:
 		}
 
 		if (need_resched()) {
-			cond_resched_rcu();
+			rcu_read_unlock();
+			rcu_read_lock();
 			start = iter.index + 1;
 			goto restart;
 		}
@@ -2007,7 +2008,8 @@ restart:
 			spin_unlock_irq(&mapping->tree_lock);
 continue_resched:
 			if (need_resched()) {
-				cond_resched_rcu();
+				rcu_read_unlock();
+				rcu_read_lock();
 				start = iter.index + 1;
 				goto restart;
 			}
