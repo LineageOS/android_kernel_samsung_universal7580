@@ -2070,7 +2070,7 @@ free_root_inode:
 	dput(sb->s_root);
 	sb->s_root = NULL;
 free_node_inode:
-	truncate_inode_pages(NODE_MAPPING(sbi), 0);
+	truncate_inode_pages_final(NODE_MAPPING(sbi));
 	mutex_lock(&sbi->umount_mutex);
 	release_ino_entry(sbi, true);
 	f2fs_leave_shrinker(sbi);
@@ -2080,7 +2080,7 @@ free_node_inode:
 	 * followed by write_checkpoint() through f2fs_write_node_pages(), which
 	 * falls into an infinite loop in sync_meta_pages().
 	 */
-	truncate_inode_pages(META_MAPPING(sbi), 0);
+	truncate_inode_pages_final(META_MAPPING(sbi));
 	iput(sbi->node_inode);
 	mutex_unlock(&sbi->umount_mutex);
 free_nm:

@@ -134,8 +134,8 @@ static long swap_inode_boot_loader(struct super_block *sb,
 	 * that only 1 swap_inode_boot_loader is running. */
 	ext4_inode_double_lock(inode, inode_bl);
 
-	truncate_inode_pages(&inode->i_data, 0);
-	truncate_inode_pages(&inode_bl->i_data, 0);
+	truncate_inode_pages_final(&inode->i_data);
+	truncate_inode_pages_final(&inode_bl->i_data);
 
 	/* Wait for all existing dio workers */
 	ext4_inode_block_unlocked_dio(inode);
