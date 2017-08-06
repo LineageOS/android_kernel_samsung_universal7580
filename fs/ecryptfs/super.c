@@ -132,54 +132,7 @@ static int ecryptfs_statfs(struct dentry *dentry, struct kstatfs *buf)
  */
 static void ecryptfs_evict_inode(struct inode *inode)
 {
-#if defined(CONFIG_MMC_DW_FMP_ECRYPT_FS) || defined(CONFIG_UFS_FMP_ECRYPT_FS)
-	struct inode *lower_inode;
-	struct ecryptfs_mount_crypt_stat *mount_crypt_stat =
-		&ecryptfs_superblock_to_private(inode->i_sb)->mount_crypt_stat;
-#endif
 	truncate_inode_pages_final(&inode->i_data);
-#if defined(CONFIG_MMC_DW_FMP_ECRYPT_FS) || defined(CONFIG_UFS_FMP_ECRYPT_FS)
-	if (mount_crypt_stat->flags & ECRYPTFS_USE_FMP) {
-		lower_inode = ecryptfs_inode_to_lower(inode);
-		for(;;) {
-			if (!lower_inode)
-				break;
-
-			if (!strcmp("sdcardfs", lower_inode->i_sb->s_type->name)) {
-				truncate_inode_pages_final(&lower_inode->i_data);
-				lower_inode->i_mapping->iv = NULL;
-				lower_inode->i_mapping->key = NULL;
-				lower_inode->i_mapping->key_length = 0;
-				lower_inode->i_mapping->sensitive_data_index = 0;
-				lower_inode->i_mapping->alg = NULL;
-				lower_inode->i_mapping-> hash_tfm = NULL;
-#ifdef CONFIG_CRYPTO_FIPS
-				lower_inode->i_mapping->cc_enable = 0;
-#endif
-				lower_inode = sdcardfs_lower_inode(lower_inode);
-				continue;
-			} else if (!strcmp("ext4", lower_inode->i_sb->s_type->name)) {
-				truncate_inode_pages_final(&inode->i_data);
-				lower_inode->i_mapping->iv = NULL;
-				lower_inode->i_mapping->key = NULL;
-				lower_inode->i_mapping->key_length = 0;
-				lower_inode->i_mapping->sensitive_data_index = 0;
-				lower_inode->i_mapping->alg = NULL;
-				lower_inode->i_mapping-> hash_tfm = NULL;
-#ifdef CONFIG_CRYPTO_FIPS
-				lower_inode->i_mapping->cc_enable = 0;
-#endif
-				break;
-			} else {
-				printk("%s: lower inode err: %s\n", __func__, lower_inode->i_sb->s_type->name);
-				break;
-			}
-		}
-	}
-#else
-	truncate_inode_pages_final(&inode->i_data);
-#endif
->>>>>>> adead8a... mm + fs: store shadow entries in page cache
 	clear_inode(inode);
 	iput(ecryptfs_inode_to_lower(inode));
 }

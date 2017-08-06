@@ -434,7 +434,7 @@ static int f2fs_add_inline_entries(struct inode *dir,
 	}
 	return 0;
 punch_dentry_pages:
-	truncate_inode_pages(&dir->i_data, 0);
+	truncate_inode_pages_final(&dir->i_data);
 	truncate_blocks(dir, 0, false);
 	remove_dirty_inode(dir);
 	return err;
