@@ -399,7 +399,6 @@ static int __init sec_tsp_log_late_init(void)
 late_initcall(sec_tsp_log_late_init);
 #endif /* CONFIG_SEC_DEBUG_TSP_LOG */
 
-
 #ifdef CONFIG_SEC_DEBUG_TIMA_LOG
 #ifdef   CONFIG_TIMA_RKP
 

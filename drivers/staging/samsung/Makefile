@@ -16,6 +16,7 @@ obj-$(CONFIG_BATTERY_SMART)	+= sec_batt.o
 
 # Samsung Logging Feature
 obj-$(CONFIG_SEC_EXT)		+= sec_log.o
+obj-$(CONFIG_SEC_DEBUG_LAST_KMSG)	+= sec_debug_last_kmsg.o
 # Samsung sec sysfs Feature
 obj-$(CONFIG_SEC_SYSFS)		+= sec_sysfs.o
 # Samsung Reset Feature

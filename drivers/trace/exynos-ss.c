@@ -1320,6 +1320,11 @@ static int __init exynos_ss_fixmap(void)
 		ess_info.info_log[i - 1].entry.size = size;
 	}
 	exynos_ss_output();
+#ifdef CONFIG_SEC_DEBUG
+	sec_debug_save_last_kmsg(ess_items[ESS_ITEMS_LOG_KERNEL].head_ptr,
+			ess_items[ESS_ITEMS_LOG_KERNEL].curr_ptr,
+			ess_items[ESS_ITEMS_LOG_KERNEL].entry.size);
+#endif
 	return 0;
 }
 
