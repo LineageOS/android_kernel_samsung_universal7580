@@ -176,6 +176,9 @@ fw-shipped-$(CONFIG_KEYBOARD_TC300K) += coreriver/tc350k_s5neo.fw coreriver/tc35
 fw-shipped-$(CONFIG_KEYBOARD_ABOV_TOUCH) += abov/abov_tk.fw abov/abov_ft1604_a3.fw \
 						abov/abov_ft1604_a5.fw abov/abov_ft1604_a5_ltn.fw \
 						abov/abov_ft1604_a7.fw abov/abov_ft1604_a7_chn.fw
+fw-shipped-$(CONFIG_KEYBOARD_ABOV_TOUCH_FT1804) += abov/abov_tk.fw abov/abov_ft1604_a3.fw \
+						abov/abov_ft1604_a5.fw abov/abov_ft1604_a5_ltn.fw \
+						abov/abov_ft1604_a7.fw abov/abov_ft1604_a7_chn.fw
 fw-shipped-$(CONFIG_KEYBOARD_ABOV_TOUCH_FT1804) += abov/abov_a3.fw abov/abov_a5.fw abov/abov_a5_fd.fw \
 							abov/abov_a7.fw abov/abov_a7_kor.fw
 fw-shipped-$(CONFIG_TOUCHSCREEN_ZINITIX_BT532) += tsp_zinitix/bt532_gt58.fw

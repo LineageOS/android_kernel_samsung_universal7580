@@ -31,6 +31,7 @@ struct abov_touchkey_platform_data {
 	int gpio_tkey_led_en;
 	int gpio_seperated;
 	int sub_det;
+	int ds_det;	//temp A5x ltn // only for compatibilty
 	struct regulator *vdd_io_vreg;
 	struct regulator *avdd_vreg;
 	struct regulator *dvdd_vreg;

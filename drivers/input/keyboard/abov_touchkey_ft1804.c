@@ -98,6 +98,7 @@
 //#define ABOV_PCB_VER		0x02
 //#define ABOV_COMMAND		0x03
 #define ABOV_THRESHOLD		0x02
+#define ABOV_THRESHOLD_FT16XX	0x04
 //#define ABOV_SENS			0x05
 //#define ABOV_SETIDAC		0x06
 #define ABOV_BTNSTATUS_NEW	0x07
@@ -241,10 +242,14 @@ static void abov_tk_input_close(struct input_dev *dev);
 #endif
 
 static int abov_tk_i2c_read_checksum(struct abov_tk_info *info);
+static int abov_tk_i2c_read_checksum_ft1604(struct abov_tk_info *info);
 static void abov_tk_reset(struct abov_tk_info *info);
 
 static int abov_touchkey_led_status;
 static int abov_touchled_cmd_reserved;
+
+bool is_ft1604_chip = false;
+char *fw_path;
 
 static int abov_mode_enable(struct i2c_client *client,u8 cmd_reg, u8 cmd)
 {
@@ -522,13 +527,13 @@ static irqreturn_t abov_tk_interrupt(int irq, void *dev_id)
 	wake_lock(&info->touckey_wake_lock);
 #endif
 
-	ret = abov_tk_i2c_read(client, ABOV_BTNSTATUS_NEW, &buf, 1);
+	ret = abov_tk_i2c_read(client, (is_ft1604_chip ? ABOV_BTNSTATUS : ABOV_BTNSTATUS_NEW), &buf, 1);
 	if (ret < 0) {
 		retry = 3;
 		while (retry--) {
 			tk_debug_err(true, &client->dev, "%s read fail(%d)\n",
 				__func__, retry);
-			ret = abov_tk_i2c_read(client, ABOV_BTNSTATUS_NEW, &buf, 1);
+			ret = abov_tk_i2c_read(client, (is_ft1604_chip ? ABOV_BTNSTATUS : ABOV_BTNSTATUS_NEW), &buf, 1);
 			if (ret == 0)
 				break;
 			else
@@ -749,7 +754,7 @@ static ssize_t touchkey_threshold_show(struct device *dev,
 	u8 r_buf;
 	int ret;
 
-	ret = abov_tk_i2c_read(client, ABOV_THRESHOLD, &r_buf, 1);
+	ret = abov_tk_i2c_read(client, (is_ft1604_chip ? ABOV_THRESHOLD_FT16XX : ABOV_THRESHOLD), &r_buf, 1);
 	if (ret < 0) {
 		tk_debug_err(true, &client->dev, "%s fail(%d)\n", __func__, ret);
 		r_buf = 0;
@@ -1159,7 +1164,7 @@ static ssize_t touchkey_chip_name(struct device *dev,
 
 	tk_debug_dbg(true, &client->dev, "%s\n", __func__);
 
-	return sprintf(buf, "FT1804\n");
+	return sprintf(buf, (is_ft1604_chip ? "FT1604\n" : "FT1804\n"));
 }
 
 static ssize_t bin_fw_ver(struct device *dev,
@@ -1246,6 +1251,10 @@ static int abov_load_fw(struct abov_tk_info *info, u8 cmd)
 		info->checksum_h_bin = info->firm_data_bin->data[8];
 		info->checksum_l_bin = info->firm_data_bin->data[9];
 		info->firm_size = info->firm_data_bin->size;
+
+		if (is_ft1604_chip && strncmp(info->pdata->fw_path, "abov/abov_ft1604_a3.fw", 22) == 0) {
+			info->fw_model_number = 0x30;	//A310 fw 0x05
+		}
 
 		tk_debug_info(true, &client->dev, "%s, bin version:%2X,%2X,%2X   crc:%2X,%2X\n", __func__, \
 			info->firm_data_bin->data[1], info->firm_data_bin->data[3], info->fw_ver_bin, \
@@ -1592,6 +1601,29 @@ static int abov_tk_i2c_read_checksum(struct abov_tk_info *info)
 	return 0;
 }
 
+static int abov_tk_i2c_read_checksum_ft1604(struct abov_tk_info *info)
+{
+	unsigned char data[6] = {0xAC, 0x9E, 0x10, 0x00, 0x3F, 0xFF};
+	unsigned char checksum[5] = {0, };
+	int ret;
+	unsigned char reg = 0x00;
+
+	i2c_master_send(info->client, data, 6);
+
+	usleep_range(5000, 5000);
+
+	abov_tk_check_busy(info);
+
+	ret = abov_tk_i2c_read(info->client, reg, checksum, 5);
+
+	tk_debug_info(true, &info->client->dev, "%s: ret:%d [%X][%X][%X][%X][%X]\n",
+			__func__, ret, checksum[0], checksum[1], checksum[2]
+			, checksum[3], checksum[4]);
+	info->checksum_h = checksum[3];
+	info->checksum_l = checksum[4];
+	return 0;
+}
+
 static int abov_tk_fw_write(struct abov_tk_info *info, unsigned char *addrH,
 						unsigned char *addrL, unsigned char *val)
 {
@@ -1630,9 +1662,22 @@ static int abov_tk_fw_mode_enter(struct abov_tk_info *info)
 	}
 
 	return 0;
-
 }
 
+static int abov_tk_fw_mode_enter_ft1604(struct abov_tk_info *info)
+{
+	unsigned char data[3] = {0xAC, 0x5B, 0x2D};
+	int ret = 0;
+
+	ret = i2c_master_send(info->client, data, 3);
+	if (ret != 3) {
+		tk_debug_err(true, &info->client->dev,
+			"%s: write fail\n", __func__);
+		return -1;
+	}
+
+	return 0;
+}
 
 static int abov_tk_fw_mode_check(struct abov_tk_info *info)
 {
@@ -1697,12 +1742,16 @@ static int abov_tk_fw_update(struct abov_tk_info *info, u8 cmd)
 	tk_debug_info(true, &info->client->dev, "%s start\n", __func__);
 
 	count = info->firm_size / 32;
-	address = 0x800;
+
+	address = (is_ft1604_chip ? 0x1000 : 0x800);
 
 	tk_debug_info(true, &info->client->dev, "%s reset\n", __func__);
 	abov_tk_reset_for_bootmode(info);
 	msleep(ABOV_BOOT_DELAY);
-	ret = abov_tk_fw_mode_enter(info);
+	if (is_ft1604_chip)
+		ret = abov_tk_fw_mode_enter_ft1604(info);
+	else
+		ret = abov_tk_fw_mode_enter(info);
 	if(ret<0){
 		tk_debug_err(true, &info->client->dev,
 			"%s:abov_tk_fw_mode_enter fail\n", __func__);
@@ -1741,7 +1790,10 @@ static int abov_tk_fw_update(struct abov_tk_info *info, u8 cmd)
 
 		memset(data, 0, 32);
 	}
-	ret = abov_tk_i2c_read_checksum(info);
+	if (is_ft1604_chip)
+		ret = abov_tk_i2c_read_checksum_ft1604(info);
+	else
+		ret = abov_tk_i2c_read_checksum(info);
 	tk_debug_dbg(true, &info->client->dev, "%s checksum readed\n", __func__);
 
 	ret = abov_tk_fw_mode_exit(info);
@@ -2171,7 +2223,7 @@ extern int get_samsung_lcd_attached(void);
 static int abov_tk_fw_check(struct abov_tk_info *info)
 {
 	struct i2c_client *client = info->client;
-	int ret, fw_update=0;
+	int ret, fw_update = 0;
 	u8 buf;
 
 	ret = abov_load_fw(info, BUILT_IN);
@@ -2379,10 +2431,15 @@ static int abov_parse_dt(struct device *dev,
 		tk_debug_info(true, dev, "%s: sub_det:%d\n",__func__,pdata->sub_det);
 	}
 
-	ret = of_property_read_string(np, "abov,fw_path", (const char **)&pdata->fw_path);
-	if (ret) {
-		tk_debug_err(true, dev, "touchkey:failed to read fw_path %d\n", ret);
-		pdata->fw_path = TK_FW_PATH_BIN;
+	if (is_ft1604_chip) {
+		pdata->fw_path = fw_path;
+	}
+	else {
+		ret = of_property_read_string(np, "abov,fw_path", (const char **)&pdata->fw_path);
+		if (ret) {
+			tk_debug_err(true, dev, "touchkey:failed to read fw_path %d\n", ret);
+			pdata->fw_path = TK_FW_PATH_BIN;
+		}
 	}
 	tk_debug_info(true, dev, "%s: fw path %s\n", __func__, pdata->fw_path);
 
@@ -2391,6 +2448,17 @@ static int abov_parse_dt(struct device *dev,
 	tk_debug_info(true, dev, "%s: gpio_int:%d, gpio_scl:%d, gpio_sda:%d\n",
 			__func__, pdata->gpio_int, pdata->gpio_scl,
 			pdata->gpio_sda);
+
+	if (is_ft1604_chip) { // only for compatibility
+		//temp A5x ltn
+		pdata->ds_det = of_get_named_gpio(np, "abov,ds-det",0);
+		if(pdata->ds_det < 0) {
+			tk_debug_info(true, dev, "don't check ds_det\n");
+		}
+		else {
+			tk_debug_info(true, dev, "%s: A5 LTN temp ds_det:%d\n",__func__,pdata->ds_det);
+		}
+	}
 
 	return 0;
 }
@@ -2468,6 +2536,21 @@ static int abov_tk_probe(struct i2c_client *client,
 	} else
 		info->pdata = client->dev.platform_data;
 
+	if (is_ft1604_chip) { // only for compatibility
+		//temp A5x ltn
+		if (gpio_is_valid(info->pdata->ds_det)) {
+			ret = gpio_get_value(info->pdata->ds_det);
+			if (ret == 0) {
+				tk_debug_err(true, &client->dev, "%s : 1804 DS_DET is low\n",__func__);
+			}
+			else if (ret == 1) {
+				tk_debug_err(true, &client->dev, "%s : 1804 DS_DET is high\n",__func__);
+				ret = -1;
+				goto err_config;
+			}
+		}
+	}
+
 	if (info->pdata == NULL) {
 		tk_debug_err(true, &client->dev, "failed to get platform data\n");
 		goto err_config;
@@ -2535,6 +2618,11 @@ static int abov_tk_probe(struct i2c_client *client,
 	client->irq = gpio_to_irq(info->pdata->gpio_int);
 
 	mutex_init(&info->lock);
+
+	if (is_ft1604_chip) {
+		//temp A5x ltn
+		client->addr = 0x20;
+	}
 
 	info->input_event = info->pdata->input_event;
 	info->touchkey_count = sizeof(touchkey_keycode) / sizeof(int);
@@ -2886,15 +2974,15 @@ static const struct dev_pm_ops abov_tk_pm_ops = {
 #endif
 
 static const struct i2c_device_id abov_tk_id[] = {
-	{ABOV_TK_NAME, 0},
+	{ ABOV_TK_NAME, 0},
 	{}
 };
-
-MODULE_DEVICE_TABLE(i2c, abov_tk_id);
+MODULE_DEVICE_TABLE(i2c, abov_tk_id);	
 
 #ifdef CONFIG_OF
 static struct of_device_id abov_match_table[] = {
 	{ .compatible = "abov,mc96ft18xx",},
+	{ .compatible = "abov,mc96ft16xx",}, // for abov_parse_dt
 	{ },
 };
 #else
@@ -2917,7 +3005,7 @@ static struct i2c_driver abov_tk_driver = {
 
 static int __init touchkey_init(void)
 {
-	pr_err("%s: abov,mc96ft18xx\n", __func__);
+	pr_err("%s: abov,%s\n", __func__, (is_ft1604_chip ? "mc96ft16xx" : "mc96ft18xx"));
 
 #if defined(CONFIG_BATTERY_SAMSUNG) && !defined(CONFIG_TOUCHKEY_GRIP)
 	if (lpcharge == 1) {
@@ -2938,7 +3026,24 @@ static void __exit touchkey_exit(void)
 module_init(touchkey_init);
 module_exit(touchkey_exit);
 
+static int __init get_bootloader(char *bootloader)
+{
+	is_ft1604_chip = false;
+
+	if (strstr(bootloader, "A510M") || strstr(bootloader, "A510Y")) {
+		is_ft1604_chip = true;
+		fw_path = "abov/abov_ft1604_a5_ltn.fw";
+	}
+	else if (strstr(bootloader, "A310N0") || strstr(bootloader, "A310M")) {
+		is_ft1604_chip = true;
+		fw_path = "abov/abov_ft1604_a3.fw";
+	}
+	
+	return 0;
+}
+early_param("androidboot.bootloader", get_bootloader);
+
 /* Module information */
 MODULE_AUTHOR("Samsung Electronics");
-MODULE_DESCRIPTION("Touchkey driver for Abov MF18xx chip");
+MODULE_DESCRIPTION("Touchkey driver for Abov MF16xx and MF18xx chip");
 MODULE_LICENSE("GPL");
