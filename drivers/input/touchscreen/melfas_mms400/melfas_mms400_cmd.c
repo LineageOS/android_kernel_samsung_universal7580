@@ -904,6 +904,7 @@ static void glove_mode(void *device_data)
 	if ((enable == 0) || (enable == 1)) {
 		if (mms_i2c_write(info, wbuf, 3)) {
 			tsp_debug_err(true, &info->client->dev, "%s [ERROR] mms_i2c_write\n", __func__);
+			sprintf(info->print_buf, "%s", "NG");
 			goto out;
 		} else
 			tsp_debug_info(true, &info->client->dev, "%s - value[%d]\n", __func__, wbuf[2]);
@@ -914,6 +915,7 @@ static void glove_mode(void *device_data)
 	tsp_debug_dbg(true, &info->client->dev, "%s [DONE] \n", __func__);
 
 	info->cmd_state = CMD_STATUS_OK;
+	sprintf(info->print_buf, "%s", "OK");
 	length = strlen(info->print_buf);
 	tsp_debug_err(true, &info->client->dev, "%s: length is %d\n", __func__, length);
 
