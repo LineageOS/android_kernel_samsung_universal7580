@@ -282,23 +282,6 @@ DHDCFLAGS += -DSUPPORT_TRIGGER_HANG_EVENT
 # Enable Checking Blob existence
 DHDCFLAGS += -DDHD_BLOB_EXISTENCE_CHECK
 
-# Android Version Check from Platform source
-CANDIDATE_VERSION_PATH := ./../../build/core ../../../../../../build/core out
-FOUND_VERSION_PATH := $(foreach dir,$(CANDIDATE_VERSION_PATH), $(wildcard $(dir)/version_defaults.mk))
-FOUND_VERSION_PATH := $(word 1, $(FOUND_VERSION_PATH))
-ifeq ($(FOUND_VERSION_PATH),)
-$(warning Not found Android version file. Set None)
-else
-# Extract version string and get major number
-ANDROID_PLATFORM_VERSION := $(shell grep "PLATFORM_VERSION := " $(FOUND_VERSION_PATH) | cut -d "=" -f 2 | cut -d "." -f 1 | sed 's/ //g')
-$(warning Android Platform Version : $(ANDROID_PLATFORM_VERSION))
-# If Android version lower than 7(Nougat) => Use Legacy File path
-ifeq ($(shell expr $(ANDROID_PLATFORM_VERSION) \< 7),1)
-DHDCFLAGS += -DDHD_LEGACY_FILE_PATH
-$(warning Will be use Legacy file path)
-endif
-endif
-
 ##############################
 # Android Platform Definition
 ##############################
