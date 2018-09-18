@@ -13,8 +13,9 @@ dtb-$(CONFIG_CAMERA_A7X) += exynos7580-a7xelte_eur_open_00.dtb exynos7580-a7xelt
 dtb-$(CONFIG_CAMERA_J7) += exynos7580-j7elte_rev00.dtb exynos7580-j7elte_rev04.dtb exynos7580-j7elte_rev06.dtb
 dtb-$(CONFIG_CAMERA_S5NEO) += exynos7580-s5neo_rev00.dtb exynos7580-s5neo_rev06.dtb exynos7580-s5neo_rev07.dtb exynos7580-s5neo_rev08.dtb \
 				exynos7580-s5neo_rev09.dtb exynos7580-s5neo_rev11.dtb
-dtb-$(CONFIG_CAMERA_GV) += exynos7580-gvwifi_rev09.dtb exynos7580-gvwifi_rev10.dtb exynos7580-gvlte_rev00.dtb exynos7580-gvlte_rev01.dtb \
-				exynos7580-gvlte_rev02.dtb exynos7580-gvlte_rev09.dtb exynos7580-gvlte_rev10.dtb
+dtb-$(CONFIG_MACH_GVLTE) += exynos7580-gvlte_rev00.dtb exynos7580-gvlte_rev01.dtb exynos7580-gvlte_rev02.dtb exynos7580-gvlte_rev09.dtb \
+				exynos7580-gvlte_rev10.dtb
+dtb-$(CONFIG_MACH_GVWIFI) += exynos7580-gvwifi_rev09.dtb exynos7580-gvwifi_rev10.dtb
 
 dtb-$(CONFIG_MACH_UNIVERSAL5433) += exynos5433-universal5433_rev02.dtb exynos5433-universal5433.dtb
 targets += dtbs

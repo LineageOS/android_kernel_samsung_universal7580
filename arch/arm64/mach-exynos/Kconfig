@@ -309,6 +309,16 @@ config SEC_FACTORY
 	help
 	  Include some codes for Factory binary.
 
+config MACH_GVWIFI
+	bool "SAMSUNG Galaxy View WIFI"
+	default n
+	depends on SOC_EXYNOS7580
+
+config MACH_GVLTE
+	bool "SAMSUNG Galaxy View LTE"
+	default n
+	depends on SOC_EXYNOS7580
+
 endmenu
 
 # Reset IPs during LPA/DSTOP
