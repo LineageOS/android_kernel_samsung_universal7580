@@ -578,6 +578,39 @@ power_attr(pm_freeze_timeout);
 
 #endif	/* CONFIG_FREEZER*/
 
+#ifdef CONFIG_SW_SELF_DISCHARGING
+static char selfdischg_usage_str[] =
+	"[START]\n"
+#ifdef CONFIG_EXYNOS7580_QUAD
+	"/sys/power/cpufreq_self_discharging 800000\n"
+#else
+	"/sys/power/cpufreq_self_discharging 400000\n"
+#endif
+	"/sys/devices/system/cpu/clusterhotplug/force_hstate 0\n"
+	"/sys/module/cpuidle/parameters/off 1\n"
+	"[STOP]\n"
+	"/sys/power/cpufreq_self_discharging 0\n"
+	"/sys/devices/system/cpu/clusterhotplug/force_hstate -1\n"
+	"/sys/module/cpuidle/parameters/off 0\n"
+	"[END]\n";
+
+static ssize_t selfdischg_usage_show(struct kobject *kobj,
+					struct kobj_attribute *attr,
+					char *buf)
+{
+	pr_info("%s\n", __func__);
+	return sprintf(buf, "%s", selfdischg_usage_str);
+}
+
+static struct kobj_attribute selfdischg_usage_attr = {
+	.attr	= {
+		.name = __stringify(selfdischg_usage),
+		.mode = 0440,
+	},
+	.show	= selfdischg_usage_show,
+};
+#endif /* CONFIG_SW_SELF_DISCHARGING */
+
 static struct attribute * g[] = {
 	&state_attr.attr,
 #ifdef CONFIG_PM_TRACE
@@ -603,6 +636,9 @@ static struct attribute * g[] = {
 #endif
 #ifdef CONFIG_FREEZER
 	&pm_freeze_timeout_attr.attr,
+#endif
+#ifdef CONFIG_SW_SELF_DISCHARGING
+	&selfdischg_usage_attr.attr,
 #endif
 	NULL,
 };
@@ -639,6 +675,7 @@ static int __init pm_init(void)
 	if (error)
 		return error;
 	pm_print_times_init();
+
 	return pm_autosleep_init();
 }
 

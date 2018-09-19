@@ -345,6 +345,15 @@ struct v4l2_pix_format {
 #define V4L2_PIX_FMT_NV24    v4l2_fourcc('N', 'V', '2', '4') /* 24  Y/CbCr 4:4:4  */
 #define V4L2_PIX_FMT_NV42    v4l2_fourcc('N', 'V', '4', '2') /* 24  Y/CrCb 4:4:4  */
 
+/* for scaler : blending operation */
+#define V4L2_PIX_FMT_NV12M_RGB32    v4l2_fourcc('N', 'V', 'R', 'G') /* 12  Y/CbCr 4:2:0 RGBA  */
+#define V4L2_PIX_FMT_NV12M_BGR32    v4l2_fourcc('N', 'V', 'B', 'G') /* 12  Y/CbCr 4:2:0 ARGB  */
+#define V4L2_PIX_FMT_NV12M_RGB565   v4l2_fourcc('N', 'V', 'R', '6') /* 12  Y/CbCr 4:2:0 RGB565  */
+#define V4L2_PIX_FMT_NV12M_RGB444   v4l2_fourcc('N', 'V', 'R', '4') /* 12  Y/CbCr 4:2:0 RGB444  */
+#define V4L2_PIX_FMT_NV12M_RGB555X   v4l2_fourcc('N', 'V', 'R', '5') /* 12  Y/CbCr 4:2:0 RGB555X  */
+#define V4L2_PIX_FMT_NV12MT_16X16_RGB32 v4l2_fourcc('V', 'M', 'R', 'G') /* 12  Y/CbCr 4:2:0 16x16 macroblocks */
+#define V4L2_PIX_FMT_NV12_RGB32 v4l2_fourcc('N', 'V', '1', 'R') /* 12  Y/CbCr 4:2:0 RGBA */
+
 /* two non contiguous planes - one Y, one Cr + Cb interleaved  */
 #define V4L2_PIX_FMT_NV12M   v4l2_fourcc('N', 'M', '1', '2') /* 12  Y/CbCr 4:2:0  */
 #define V4L2_PIX_FMT_NV21M   v4l2_fourcc('N', 'M', '2', '1') /* 21  Y/CrCb 4:2:0  */
@@ -685,6 +694,8 @@ struct v4l2_buffer {
 #define V4L2_BUF_FLAG_TIMESTAMP_UNKNOWN		0x0000
 #define V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC	0x2000
 #define V4L2_BUF_FLAG_TIMESTAMP_COPY		0x4000
+/* Expects and returns a sync fence */
+#define V4L2_BUF_FLAG_USE_SYNC	0x8000
 
 /**
  * struct v4l2_exportbuffer - export of video buffer as DMABUF file descriptor
@@ -1071,6 +1082,9 @@ struct v4l2_dv_timings {
 /* Values for the type field */
 #define V4L2_DV_BT_656_1120	0	/* BT.656/1120 timing type */
 
+#define V4L2_DV_BT_SB_HALF	(1 << 8)	/* side-by-side S3D type */
+#define V4L2_DV_BT_TB		(1 << 6)	/* top and bottom S3D type */
+#define V4L2_DV_BT_FP		(1 << 0)	/* frame packing S3D type */
 
 /** struct v4l2_enum_dv_timings - DV timings enumeration
  * @index:	enumeration index

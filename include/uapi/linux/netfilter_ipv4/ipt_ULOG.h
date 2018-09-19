@@ -1,7 +1,7 @@
 /* Header file for IP tables userspace logging, Version 1.8
  *
  * (C) 2000-2002 by Harald Welte <laforge@gnumonks.org>
- * 
+ *
  * Distributed under the terms of GNU GPL */
 
 #ifndef _IPT_ULOG_H
@@ -32,6 +32,21 @@ struct ipt_ulog_info {
 };
 
 /* Format of the ULOG packets passed through netlink */
+#ifdef CONFIG_NETFILTER_XT_MATCH_QUOTA2_LOG_32BIT
+typedef struct ulog_packet_msg {
+	unsigned int mark;
+	int timestamp_sec;
+	int timestamp_usec;
+	unsigned int hook;
+	char indev_name[IFNAMSIZ];
+	char outdev_name[IFNAMSIZ];
+	unsigned int data_len;
+	char prefix[ULOG_PREFIX_LEN];
+	unsigned char mac_len;
+	unsigned char mac[ULOG_MAC_LEN];
+	unsigned char payload[0];
+} ulog_packet_msg_t;
+#else
 typedef struct ulog_packet_msg {
 	unsigned long mark;
 	long timestamp_sec;
@@ -45,5 +60,6 @@ typedef struct ulog_packet_msg {
 	unsigned char mac[ULOG_MAC_LEN];
 	unsigned char payload[0];
 } ulog_packet_msg_t;
+#endif
 
 #endif /*_IPT_ULOG_H*/

@@ -473,7 +473,7 @@ static char * __init unpack_to_rootfs(char *buf, unsigned len)
 			error("junk in compressed archive");
 		this_header = saved_offset + my_inptr;
 		buf += my_inptr;
-		len -= my_inptr;
+		len = 0;
 	}
 	dir_utime();
 	kfree(name_buf);

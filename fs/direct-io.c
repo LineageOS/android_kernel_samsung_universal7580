@@ -380,11 +380,13 @@ static inline void dio_bio_submit(struct dio *dio, struct dio_submit *sdio)
 	if (dio->is_async && dio->rw == READ)
 		bio_set_pages_dirty(bio);
 
+	dio->rw |= REQ_KERNEL;
 	if (sdio->submit_io)
 		sdio->submit_io(dio->rw, bio, dio->inode,
 			       sdio->logical_offset_in_bio);
 	else
 		submit_bio(dio->rw, bio);
+	dio->rw &= ~(REQ_KERNEL);
 
 	sdio->bio = NULL;
 	sdio->boundary = 0;

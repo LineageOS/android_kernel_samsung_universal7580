@@ -202,12 +202,12 @@ of_get_gpio_regulator_config(struct device *dev, struct device_node *np)
 	}
 	config->nr_states = i;
 
-	of_property_read_string(np, "regulator-type", &regtype);
-
-	if (!strncmp("voltage", regtype, 7))
-		config->type = REGULATOR_VOLTAGE;
-	else if (!strncmp("current", regtype, 7))
-		config->type = REGULATOR_CURRENT;
+	if (!of_property_read_string(np, "regulator-type", &regtype)) {
+		if (!strncmp("voltage", regtype, 7))
+			config->type = REGULATOR_VOLTAGE;
+		else if (!strncmp("current", regtype, 7))
+			config->type = REGULATOR_CURRENT;
+	}
 
 	return config;
 }

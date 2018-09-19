@@ -25,7 +25,6 @@
 #include "u_ether.h"
 #include "rndis.h"
 
-
 /*
  * This function is an RNDIS Ethernet port -- a Microsoft protocol that's
  * been promoted instead of the standard CDC Ethernet.  The published RNDIS
@@ -67,6 +66,21 @@
  *   - MS-Windows drivers sometimes emit undocumented requests.
  */
 
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+static DEFINE_MUTEX(cpufreq_lock);
+#endif
+#ifdef CONFIG_USB_RNDIS_MULTIPACKET
+static unsigned int rndis_dl_max_pkt_per_xfer = 10;
+module_param(rndis_dl_max_pkt_per_xfer, uint, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(rndis_dl_max_pkt_per_xfer,
+	"Maximum packets per transfer for DL aggregation");
+
+static unsigned int rndis_ul_max_pkt_per_xfer = 3;
+module_param(rndis_ul_max_pkt_per_xfer, uint, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(rndis_ul_max_pkt_per_xfer,
+	"Maximum packets per transfer for UL aggregation");
+#endif
+
 struct f_rndis {
 	struct gether			port;
 	u8				ctrl_id, data_id;
@@ -78,6 +92,12 @@ struct f_rndis {
 	struct usb_ep			*notify;
 	struct usb_request		*notify_req;
 	atomic_t			notify_count;
+
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+	bool cpufreq_lock_status;
+	struct pm_qos_request rndis_cpu_qos;
+	struct pm_qos_request rndis_mif_qos;
+#endif
 };
 
 static inline struct f_rndis *func_to_rndis(struct usb_function *f)
@@ -144,6 +164,40 @@ static struct usb_cdc_acm_descriptor rndis_acm_descriptor = {
 
 	.bmCapabilities =	0x00,
 };
+
+#if defined(CONFIG_USB_RNDIS_VZW_REQ)
+/* In VZW Models size of MTU is fixed using Devguru AVD Descriptor */
+
+struct usb_rndis_mtu_avd_descriptor {
+	__u8	bLength;
+	__u8    bDescriptorType;
+	__u8    bDescriptorSubType;
+
+	__u16   bDAU1_Type;
+	__u16   bDAU1_Length;
+	__u32   bDAU1_Value;
+
+	__u16   bDAU2_Type;
+	__u16   bDAU2_Length;
+	__u8    bDAU2_Value;
+} __attribute__ ((packed));
+
+static struct usb_rndis_mtu_avd_descriptor rndis_avd_descriptor = {
+	.bLength            =   0x10,
+	.bDescriptorType    =   0x24,
+	.bDescriptorSubType =   0x80,
+
+	/* First DAU = MTU Size */
+	.bDAU1_Type         =   0x000A,
+	.bDAU1_Length       =   0x0004,
+	.bDAU1_Value        =   0x00000594,     /* 1428Byte */
+
+	/* Second DAU = Rndis version */
+	.bDAU2_Type         =   0x000B,
+	.bDAU2_Length       =   0x0001,
+	.bDAU2_Value        =   0x01,           /* Rndis5.1 */
+};
+#endif
 
 static struct usb_cdc_union_desc rndis_union_desc = {
 	.bLength =		sizeof(rndis_union_desc),
@@ -224,6 +278,9 @@ static struct usb_descriptor_header *eth_fs_function[] = {
 	(struct usb_descriptor_header *) &rndis_data_intf,
 	(struct usb_descriptor_header *) &fs_in_desc,
 	(struct usb_descriptor_header *) &fs_out_desc,
+#if defined(CONFIG_USB_RNDIS_VZW_REQ)
+	(struct usb_descriptor_header *) &rndis_avd_descriptor,
+#endif
 	NULL,
 };
 
@@ -272,6 +329,9 @@ static struct usb_descriptor_header *eth_hs_function[] = {
 	(struct usb_descriptor_header *) &rndis_data_intf,
 	(struct usb_descriptor_header *) &hs_in_desc,
 	(struct usb_descriptor_header *) &hs_out_desc,
+#if defined(CONFIG_USB_RNDIS_VZW_REQ)
+	(struct usb_descriptor_header *) &rndis_avd_descriptor,
+#endif
 	NULL,
 };
 
@@ -365,18 +425,84 @@ static struct usb_gadget_strings *rndis_strings[] = {
 };
 
 /*-------------------------------------------------------------------------*/
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+void rndis_cpufreq_lock(void *_rndis)
+{
+	struct f_rndis *rndis = _rndis;
+
+	if (!rndis->cpufreq_lock_status) {
+		mutex_lock(&cpufreq_lock);
+
+		/* CPU KFC 300MHz */
+		pm_qos_add_request(&rndis->rndis_cpu_qos,
+				PM_QOS_CLUSTER1_FREQ_MIN, 300000);
+		/* MIF 800MHz */
+		pm_qos_add_request(&rndis->rndis_mif_qos,
+				PM_QOS_BUS_THROUGHPUT, 800000);
+
+		mutex_unlock(&cpufreq_lock);
+
+		rndis->cpufreq_lock_status = true;
+		printk("cpufreq locked\n");
+	}
+}
+
+void rndis_cpufreq_unlock(void *_rndis)
+{
+	struct f_rndis *rndis = _rndis;
+
+	if (rndis->cpufreq_lock_status != true)
+		return;
+
+	printk("cpufreq unlock\n");
+
+	mutex_lock(&cpufreq_lock);
+
+	pm_qos_remove_request(&rndis->rndis_cpu_qos);
+	pm_qos_remove_request(&rndis->rndis_mif_qos);
+
+	mutex_unlock(&cpufreq_lock);
+	rndis->cpufreq_lock_status = false;
+}
+#endif
 
 static struct sk_buff *rndis_add_header(struct gether *port,
 					struct sk_buff *skb)
 {
 	struct sk_buff *skb2;
 
-	skb2 = skb_realloc_headroom(skb, sizeof(struct rndis_packet_msg_type));
-	if (skb2)
-		rndis_add_hdr(skb2);
+#ifdef CONFIG_USB_RNDIS_MULTIPACKET
+	struct rndis_packet_msg_type *header = NULL;
+	struct f_rndis *rndis = func_to_rndis(&port->func);
 
-	dev_kfree_skb_any(skb);
-	return skb2;
+	if (rndis->port.multi_pkt_xfer) {
+		if (port->header) {
+			header = port->header;
+			memset(header, 0, sizeof(*header));
+			header->MessageType = cpu_to_le32(RNDIS_MSG_PACKET);
+			header->MessageLength = cpu_to_le32(skb->len +
+							sizeof(*header));
+			header->DataOffset = cpu_to_le32(36);
+			header->DataLength = cpu_to_le32(skb->len);
+			pr_debug("MessageLength:%d DataLength:%d\n",
+						header->MessageLength,
+						header->DataLength);
+			return skb;
+		} else {
+			pr_err("RNDIS header is NULL.\n");
+			return NULL;
+		}
+	} else
+#endif
+	{
+		skb2 = skb_realloc_headroom(skb,
+				sizeof(struct rndis_packet_msg_type));
+		if (skb2)
+			rndis_add_hdr(skb2);
+
+		dev_kfree_skb_any(skb);
+		return skb2;
+	}
 }
 
 static void rndis_response_available(void *_rndis)
@@ -390,6 +516,8 @@ static void rndis_response_available(void *_rndis)
 	if (atomic_inc_return(&rndis->notify_count) != 1)
 		return;
 
+	if (!rndis->notify->driver_data)
+		return;
 	/* Send RNDIS RESPONSE_AVAILABLE notification; a
 	 * USB_CDC_NOTIFY_RESPONSE_AVAILABLE "should" work too
 	 *
@@ -408,8 +536,13 @@ static void rndis_response_available(void *_rndis)
 static void rndis_response_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	struct f_rndis			*rndis = req->context;
-	struct usb_composite_dev	*cdev = rndis->port.func.config->cdev;
+	struct usb_composite_dev	*cdev;
 	int				status = req->status;
+
+	if (!rndis->port.func.config || !rndis->port.func.config->cdev)
+		return;
+	else
+		cdev = rndis->port.func.config->cdev;
 
 	/* after TX:
 	 *  - USB_CDC_GET_ENCAPSULATED_RESPONSE (ep0/control)
@@ -448,6 +581,15 @@ static void rndis_command_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	struct f_rndis			*rndis = req->context;
 	int				status;
+#ifdef CONFIG_USB_RNDIS_MULTIPACKET
+	struct usb_composite_dev	*cdev;
+	rndis_init_msg_type		*buf;
+
+	if (!rndis->port.func.config || !rndis->port.func.config->cdev)
+		return;
+	else
+		cdev = rndis->port.func.config->cdev;
+#endif
 
 	/* received RNDIS command from USB_CDC_SEND_ENCAPSULATED_COMMAND */
 //	spin_lock(&dev->lock);
@@ -455,6 +597,22 @@ static void rndis_command_complete(struct usb_ep *ep, struct usb_request *req)
 	if (status < 0)
 		pr_err("RNDIS command error %d, %d/%d\n",
 			status, req->actual, req->length);
+#ifdef CONFIG_USB_RNDIS_MULTIPACKET
+	buf = (rndis_init_msg_type *)req->buf;
+
+	if (buf->MessageType == RNDIS_MSG_INIT) {
+		if (buf->MaxTransferSize > 2048)
+			rndis->port.multi_pkt_xfer = 1;
+		else
+			rndis->port.multi_pkt_xfer = 0;
+		DBG(cdev, "%s: MaxTransferSize: %d : Multi_pkt_txr: %s\n",
+				__func__, buf->MaxTransferSize,
+				rndis->port.multi_pkt_xfer ? "enabled" :
+							    "disabled");
+		if (rndis_dl_max_pkt_per_xfer <= 1)
+			rndis->port.multi_pkt_xfer = 0;
+	}
+#endif
 //	spin_unlock(&dev->lock);
 }
 
@@ -748,6 +906,9 @@ rndis_bind(struct usb_configuration *c, struct usb_function *f)
 
 	rndis_set_param_medium(rndis->config, RNDIS_MEDIUM_802_3, 0);
 	rndis_set_host_mac(rndis->config, rndis->ethaddr);
+#ifdef CONFIG_USB_RNDIS_MULTIPACKET
+	rndis_set_max_pkt_xfer(rndis->config, rndis_ul_max_pkt_per_xfer);
+#endif
 
 	if (rndis->manufacturer && rndis->vendorID &&
 			rndis_set_param_vendor(rndis->config, rndis->vendorID,
@@ -758,6 +919,9 @@ rndis_bind(struct usb_configuration *c, struct usb_function *f)
 	 * the network link ... which is unavailable to this code
 	 * until we're activated via set_alt().
 	 */
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+	rndis_cpufreq_lock(rndis);
+#endif
 
 	DBG(cdev, "RNDIS: %s speed IN/%s OUT/%s NOTIFY/%s\n",
 			gadget_is_superspeed(c->cdev->gadget) ? "super" :
@@ -801,6 +965,10 @@ rndis_unbind(struct usb_configuration *c, struct usb_function *f)
 	kfree(rndis->notify_req->buf);
 	usb_ep_free_request(rndis->notify, rndis->notify_req);
 
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+	rndis_cpufreq_unlock(rndis);
+#endif
+
 	kfree(rndis);
 }
 
@@ -821,12 +989,12 @@ rndis_bind_config_vendor(struct usb_configuration *c, u8 ethaddr[ETH_ALEN],
 	if (!can_support_rndis(c) || !ethaddr)
 		return -EINVAL;
 
-	if (rndis_string_defs[0].id == 0) {
-		/* ... and setup RNDIS itself */
-		status = rndis_init();
-		if (status < 0)
-			return status;
+	/* setup RNDIS itself */
+	status = rndis_init();
+	if (status < 0)
+		return status;
 
+	if (rndis_string_defs[0].id == 0) {
 		status = usb_string_ids_tab(c->cdev, rndis_string_defs);
 		if (status)
 			return status;
@@ -854,6 +1022,10 @@ rndis_bind_config_vendor(struct usb_configuration *c, u8 ethaddr[ETH_ALEN],
 	rndis->port.header_len = sizeof(struct rndis_packet_msg_type);
 	rndis->port.wrap = rndis_add_header;
 	rndis->port.unwrap = rndis_rm_hdr;
+#ifdef CONFIG_USB_RNDIS_MULTIPACKET
+	rndis->port.ul_max_pkts_per_xfer = rndis_ul_max_pkt_per_xfer;
+	rndis->port.dl_max_pkts_per_xfer = rndis_dl_max_pkt_per_xfer;
+#endif
 
 	rndis->port.func.name = "rndis";
 	rndis->port.func.strings = rndis_strings;

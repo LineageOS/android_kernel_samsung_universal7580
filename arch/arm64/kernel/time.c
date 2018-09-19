@@ -35,9 +35,12 @@
 #include <linux/clocksource.h>
 
 #include <clocksource/arm_arch_timer.h>
+#include <clocksource/exynos_mct.h>
 
 #include <asm/thread_info.h>
 #include <asm/stacktrace.h>
+#include <asm/mach/arch.h>
+#include <linux/clk-provider.h>
 
 #ifdef CONFIG_SMP
 unsigned long profile_pc(struct pt_regs *regs)
@@ -61,12 +64,14 @@ unsigned long profile_pc(struct pt_regs *regs)
 EXPORT_SYMBOL(profile_pc);
 #endif
 
+#ifndef CONFIG_CLKSRC_EXYNOS_MCT
 static u64 sched_clock_mult __read_mostly;
 
 unsigned long long notrace sched_clock(void)
 {
 	return arch_timer_read_counter() * sched_clock_mult;
 }
+#endif
 
 int read_current_timer(unsigned long *timer_value)
 {
@@ -78,14 +83,12 @@ void __init time_init(void)
 {
 	u32 arch_timer_rate;
 
+	of_clk_init(NULL);
 	clocksource_of_init();
 
 	arch_timer_rate = arch_timer_get_rate();
 	if (!arch_timer_rate)
 		panic("Unable to initialise architected timer.\n");
-
-	/* Cache the sched_clock multiplier to save a divide in the hot path. */
-	sched_clock_mult = NSEC_PER_SEC / arch_timer_rate;
 
 	/* Calibrate the delay loop directly */
 	lpj_fine = arch_timer_rate / HZ;

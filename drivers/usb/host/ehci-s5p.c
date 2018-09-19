@@ -17,6 +17,7 @@
 #include <linux/io.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/notifier.h>
 #include <linux/of.h>
 #include <linux/of_gpio.h>
 #include <linux/platform_device.h>
@@ -26,6 +27,8 @@
 #include <linux/usb.h>
 #include <linux/usb/hcd.h>
 #include <linux/usb/otg.h>
+
+#include <mach/exynos-pm.h>
 
 #include "ehci.h"
 
@@ -43,14 +46,115 @@
 static const char hcd_name[] = "ehci-s5p";
 static struct hc_driver __read_mostly s5p_ehci_hc_driver;
 
+static int (*bus_resume)(struct usb_hcd *);
+
+struct exynos_ehci_drvdata {
+	const char **clk_names;
+	int clk_size;
+	bool rpm_enable;
+};
+
 struct s5p_ehci_hcd {
 	struct clk *clk;
+	struct clk **clocks;
 	struct usb_phy *phy;
 	struct usb_otg *otg;
 	struct s5p_ehci_platdata *pdata;
+	struct notifier_block lpa_nb;
+	const struct exynos_ehci_drvdata *drvdata;
+	int power_on;
+	int retention;
+	unsigned post_lpa_resume:1;
 };
 
 #define to_s5p_ehci(hcd)      (struct s5p_ehci_hcd *)(hcd_to_ehci(hcd)->priv)
+
+static inline const struct exynos_ehci_drvdata
+*exynos_ehci_get_driver_data(struct platform_device *pdev);
+
+static int s5p_ehci_clk_prepare_enable(struct s5p_ehci_hcd *s5p_ehci)
+{
+	int i;
+	int ret;
+
+	if (s5p_ehci->clk) {
+		ret = clk_prepare_enable(s5p_ehci->clk);
+		if (ret)
+			return ret;
+	} else {
+		for (i = 0; s5p_ehci->clocks[i] != NULL; i++) {
+			ret = clk_prepare_enable(s5p_ehci->clocks[i]);
+			if (ret)
+				goto err;
+		}
+	}
+
+	return 0;
+
+err:
+	/* roll back */
+	for (i = i - 1; i >= 0; i--)
+		clk_disable_unprepare(s5p_ehci->clocks[i]);
+
+	return ret;
+}
+
+static void s5p_ehci_clk_disable_unprepare(struct s5p_ehci_hcd *s5p_ehci)
+{
+	int i;
+
+	if (s5p_ehci->clk) {
+		clk_disable_unprepare(s5p_ehci->clk);
+	} else {
+		for (i = 0; s5p_ehci->clocks[i] != NULL; i++)
+			clk_disable_unprepare(s5p_ehci->clocks[i]);
+	}
+}
+
+static int s5p_ehci_clk_get(struct s5p_ehci_hcd *s5p_ehci, struct device *dev)
+{
+	const char *clk_id;
+	const char **s5p_ehci_clk_names;
+	struct clk *clk;
+	int size;
+	int i;
+
+	clk_id = "usbhost";
+	clk = devm_clk_get(dev, clk_id);
+	if (IS_ERR_OR_NULL(clk)) {
+		dev_info(dev, "IP clock gating is N/A\n");
+		s5p_ehci->clk = NULL;
+		/* fallback to separate clock control */
+		s5p_ehci_clk_names = s5p_ehci->drvdata->clk_names;
+		size = s5p_ehci->drvdata->clk_size;
+		s5p_ehci->clocks = (struct clk **) devm_kmalloc(dev,
+				size * sizeof(struct clk *),
+				GFP_KERNEL);
+		if (!s5p_ehci->clocks)
+			return -ENOMEM;
+
+		for (i = 0; s5p_ehci_clk_names[i] != NULL; i++) {
+			clk_id = s5p_ehci_clk_names[i];
+			clk = devm_clk_get(dev, clk_id);
+			if (IS_ERR_OR_NULL(clk))
+				goto err;
+
+			s5p_ehci->clocks[i] = clk;
+		}
+
+		s5p_ehci->clocks[i] = NULL;
+
+	} else {
+		s5p_ehci->clk = clk;
+	}
+
+	return 0;
+
+err:
+	dev_err(dev, "couldn't get %s clock\n", clk_id);
+
+	return -EINVAL;
+}
 
 static void s5p_setup_vbus_gpio(struct platform_device *pdev)
 {
@@ -61,6 +165,7 @@ static void s5p_setup_vbus_gpio(struct platform_device *pdev)
 	if (!dev->of_node)
 		return;
 
+#if !defined(CONFIG_USB_EXYNOS_SWITCH)
 	gpio = of_get_named_gpio(dev->of_node, "samsung,vbus-gpio", 0);
 	if (!gpio_is_valid(gpio))
 		return;
@@ -69,16 +174,179 @@ static void s5p_setup_vbus_gpio(struct platform_device *pdev)
 				    "ehci_vbus_gpio");
 	if (err)
 		dev_err(dev, "can't request ehci vbus gpio %d", gpio);
+	else
+		gpio_set_value(gpio, 1);
+#endif
+
+	gpio = of_get_named_gpio(dev->of_node, "samsung,boost5v-gpio", 0);
+	if (!gpio_is_valid(gpio))
+		return;
+
+	err = devm_gpio_request_one(dev, gpio, GPIOF_OUT_INIT_HIGH,
+				    "usb_boost5v_gpio");
+	if (err)
+		dev_err(dev, "can't request usb boost5v gpio %d", gpio);
+	else
+		gpio_set_value(gpio, 1);
+}
+
+static int s5p_ehci_configurate(struct usb_hcd *hcd)
+{
+	int delay_count = 0;
+
+	/* This is for waiting phy before ehci configuration */
+	do {
+		if (readl(hcd->regs))
+			break;
+		udelay(1);
+		++delay_count;
+	} while (delay_count < 200);
+	if (delay_count)
+		dev_info(hcd->self.controller, "phy delay count = %d\n",
+			delay_count);
+
+	return 0;
+}
+
+static void s5p_ehci_phy_init(struct platform_device *pdev)
+{
+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+	struct s5p_ehci_hcd *s5p_ehci = to_s5p_ehci(hcd);
+
+	if (s5p_ehci->phy) {
+		usb_phy_init(s5p_ehci->phy);
+		s5p_ehci->post_lpa_resume = 0;
+	} else if (s5p_ehci->pdata->phy_init) {
+		s5p_ehci->pdata->phy_init(pdev, USB_PHY_TYPE_HOST);
+	} else {
+		dev_err(&pdev->dev, "Failed to init ehci phy\n");
+		return;
+	}
+
+	s5p_ehci_configurate(hcd);
+}
+
+static ssize_t show_ehci_power(struct device *dev,
+				struct device_attribute *attr,
+				char *buf)
+{
+	struct usb_hcd *hcd = dev_get_drvdata(dev);
+	struct s5p_ehci_hcd *s5p_ehci = to_s5p_ehci(hcd);
+
+	return snprintf(buf, PAGE_SIZE, "EHCI Power %s\n",
+			(s5p_ehci->power_on) ? "on" : "off");
+}
+
+static ssize_t store_ehci_power(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct usb_hcd *hcd = dev_get_drvdata(dev);
+	struct s5p_ehci_hcd *s5p_ehci = to_s5p_ehci(hcd);
+	int power_on;
+	int irq;
+	int retval;
+
+	if (sscanf(buf, "%d", &power_on) != 1)
+		return -EINVAL;
+
+	device_lock(dev);
+
+	if (!power_on && s5p_ehci->power_on) {
+		dev_info(dev, "EHCI turn off\n");
+		pm_runtime_forbid(dev);
+		s5p_ehci->power_on = 0;
+		usb_remove_hcd(hcd);
+
+		if (s5p_ehci->phy) {
+			/* Shutdown PHY only if it wasn't shutdown before */
+			if (!s5p_ehci->post_lpa_resume)
+				usb_phy_shutdown(s5p_ehci->phy);
+		} else if (s5p_ehci->pdata->phy_exit) {
+			s5p_ehci->pdata->phy_exit(pdev, USB_PHY_TYPE_HOST);
+		}
+	} else if (power_on) {
+		dev_info(dev, "EHCI turn on\n");
+		if (s5p_ehci->power_on) {
+			pm_runtime_forbid(dev);
+			usb_remove_hcd(hcd);
+		} else {
+			s5p_ehci_phy_init(pdev);
+		}
+
+		irq = platform_get_irq(pdev, 0);
+		retval = usb_add_hcd(hcd, irq, IRQF_SHARED);
+		if (retval < 0) {
+			dev_err(dev, "Power On Fail\n");
+			goto exit;
+		}
+
+		/*
+		 * EHCI root hubs are expected to handle remote wakeup.
+		 * So, wakeup flag init defaults for root hubs.
+		 */
+		device_wakeup_enable(&hcd->self.root_hub->dev);
+
+		s5p_ehci->power_on = 1;
+		pm_runtime_allow(dev);
+	}
+exit:
+	device_unlock(dev);
+	return count;
+}
+
+static DEVICE_ATTR(ehci_power, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP,
+	show_ehci_power, store_ehci_power);
+
+static inline int create_ehci_sys_file(struct ehci_hcd *ehci)
+{
+	return device_create_file(ehci_to_hcd(ehci)->self.controller,
+			&dev_attr_ehci_power);
+}
+
+static inline void remove_ehci_sys_file(struct ehci_hcd *ehci)
+{
+	device_remove_file(ehci_to_hcd(ehci)->self.controller,
+			&dev_attr_ehci_power);
+}
+
+static int
+s5p_ehci_lpa_event(struct notifier_block *nb, unsigned long event, void *data)
+{
+	struct s5p_ehci_hcd *s5p_ehci = container_of(nb,
+					struct s5p_ehci_hcd, lpa_nb);
+	int ret = NOTIFY_OK;
+
+	switch (event) {
+	case LPA_ENTER:
+		/*
+		 * For the purpose of reducing of power consumption in LPA mode
+		 * the PHY should be completely shutdown and reinitialized after
+		 * exit from LPA.
+		 */
+		if (s5p_ehci->phy)
+			usb_phy_shutdown(s5p_ehci->phy);
+
+		s5p_ehci->post_lpa_resume = 1;
+		break;
+	default:
+		ret = NOTIFY_DONE;
+	}
+
+	return ret;
 }
 
 static int s5p_ehci_probe(struct platform_device *pdev)
 {
 	struct s5p_ehci_platdata *pdata = pdev->dev.platform_data;
+	struct device_node *node = (&pdev->dev)->of_node;
 	struct s5p_ehci_hcd *s5p_ehci;
 	struct usb_hcd *hcd;
 	struct ehci_hcd *ehci;
 	struct resource *res;
 	struct usb_phy *phy;
+	const struct exynos_ehci_drvdata *drv_data;
 	int irq;
 	int err;
 
@@ -101,7 +369,7 @@ static int s5p_ehci_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 	s5p_ehci = to_s5p_ehci(hcd);
-	phy = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
+	phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
 	if (IS_ERR(phy)) {
 		/* Fallback to pdata */
 		if (!pdata) {
@@ -116,15 +384,22 @@ static int s5p_ehci_probe(struct platform_device *pdev)
 		s5p_ehci->otg = phy->otg;
 	}
 
-	s5p_ehci->clk = devm_clk_get(&pdev->dev, "usbhost");
+	err = of_property_read_u32_index(node, "l2-retention", 0,
+						&s5p_ehci->retention);
+	if (err)
+		dev_err(&pdev->dev, " can not find l2-retention value\n");
 
-	if (IS_ERR(s5p_ehci->clk)) {
-		dev_err(&pdev->dev, "Failed to get usbhost clock\n");
-		err = PTR_ERR(s5p_ehci->clk);
+	drv_data = exynos_ehci_get_driver_data(pdev);
+	s5p_ehci->drvdata = drv_data;
+
+	err = s5p_ehci_clk_get(s5p_ehci, &pdev->dev);
+
+	if (err) {
+		dev_err(&pdev->dev, "Failed to get clocks\n");
 		goto fail_clk;
 	}
 
-	err = clk_prepare_enable(s5p_ehci->clk);
+	err = s5p_ehci_clk_prepare_enable(s5p_ehci);
 	if (err)
 		goto fail_clk;
 
@@ -154,13 +429,40 @@ static int s5p_ehci_probe(struct platform_device *pdev)
 	if (s5p_ehci->otg)
 		s5p_ehci->otg->set_host(s5p_ehci->otg, &hcd->self);
 
-	if (s5p_ehci->phy)
+	if (s5p_ehci->phy) {
+		/* Make sure PHY is initialized */
 		usb_phy_init(s5p_ehci->phy);
-	else if (s5p_ehci->pdata->phy_init)
+		/*
+		 * PHY can be runtime suspended (e.g. by OHCI driver), so
+		 * make sure PHY is active
+		 */
+		pm_runtime_get_sync(s5p_ehci->phy->dev);
+	} else if (s5p_ehci->pdata->phy_init) {
 		s5p_ehci->pdata->phy_init(pdev, USB_PHY_TYPE_HOST);
+	}
 
 	ehci = hcd_to_ehci(hcd);
 	ehci->caps = hcd->regs;
+
+	if (node) {
+		u32 tmp_hsic_ports;
+
+		ehci->has_synopsys_hsic_bug = of_property_read_bool(node,
+							"has-synopsys-hsic");
+
+		err = of_property_read_u32(node, "hsic-ports",
+							&tmp_hsic_ports);
+		if (err) {
+			ehci->hsic_ports = 0;
+			dev_info(&pdev->dev, "HSIC ports are not defined\n");
+		} else {
+			ehci->hsic_ports = tmp_hsic_ports;
+		}
+	} else {
+		ehci->has_synopsys_hsic_bug =
+					s5p_ehci->pdata->has_synopsys_hsic_bug;
+		ehci->hsic_ports = s5p_ehci->pdata->hsic_ports;
+	}
 
 	/* DMA burst Enable */
 	writel(EHCI_INSNREG00_ENABLE_DMA_BURST, EHCI_INSNREG00(hcd->regs));
@@ -173,15 +475,43 @@ static int s5p_ehci_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, hcd);
 
+	/*
+	 * EHCI root hubs are expected to handle remote wakeup.
+	 * So, wakeup flag init defaults for root hubs.
+	 */
+	device_wakeup_enable(&hcd->self.root_hub->dev);
+
+	if (create_ehci_sys_file(ehci))
+		dev_err(&pdev->dev, "Failed to create ehci sys file\n");
+
+	s5p_ehci->lpa_nb.notifier_call = s5p_ehci_lpa_event;
+	s5p_ehci->lpa_nb.next = NULL;
+	s5p_ehci->lpa_nb.priority = 0;
+
+	if (!s5p_ehci->retention) {
+		err = exynos_pm_register_notifier(&s5p_ehci->lpa_nb);
+		if (err)
+			dev_err(&pdev->dev, "Failed to register lpa notifier\n");
+	}
+
+	s5p_ehci->power_on = 1;
+
+	if (s5p_ehci->drvdata->rpm_enable) {
+		pm_runtime_set_active(&pdev->dev);
+		pm_runtime_enable(&pdev->dev);
+	}
+
 	return 0;
 
 fail_add_hcd:
-	if (s5p_ehci->phy)
+	if (s5p_ehci->phy) {
+		pm_runtime_put_sync(s5p_ehci->phy->dev);
 		usb_phy_shutdown(s5p_ehci->phy);
-	else if (s5p_ehci->pdata->phy_exit)
+	} else if (s5p_ehci->pdata->phy_exit) {
 		s5p_ehci->pdata->phy_exit(pdev, USB_PHY_TYPE_HOST);
+	}
 fail_io:
-	clk_disable_unprepare(s5p_ehci->clk);
+	s5p_ehci_clk_disable_unprepare(s5p_ehci);
 fail_clk:
 	usb_put_hcd(hcd);
 	return err;
@@ -192,17 +522,31 @@ static int s5p_ehci_remove(struct platform_device *pdev)
 	struct usb_hcd *hcd = platform_get_drvdata(pdev);
 	struct s5p_ehci_hcd *s5p_ehci = to_s5p_ehci(hcd);
 
+	if (s5p_ehci->drvdata->rpm_enable)
+		pm_runtime_disable(&pdev->dev);
+
+	s5p_ehci->power_on = 0;
+	if (!s5p_ehci->retention)
+		exynos_pm_unregister_notifier(&s5p_ehci->lpa_nb);
+	remove_ehci_sys_file(hcd_to_ehci(hcd));
 	usb_remove_hcd(hcd);
 
 	if (s5p_ehci->otg)
 		s5p_ehci->otg->set_host(s5p_ehci->otg, &hcd->self);
 
-	if (s5p_ehci->phy)
-		usb_phy_shutdown(s5p_ehci->phy);
-	else if (s5p_ehci->pdata->phy_exit)
+	if (s5p_ehci->phy) {
+		/* Shutdown PHY only if it wasn't shutdown before */
+		if (!s5p_ehci->post_lpa_resume)
+			usb_phy_shutdown(s5p_ehci->phy);
+	} else if (s5p_ehci->pdata->phy_exit) {
 		s5p_ehci->pdata->phy_exit(pdev, USB_PHY_TYPE_HOST);
+	}
 
-	clk_disable_unprepare(s5p_ehci->clk);
+	/* clear Host */
+	if (s5p_ehci->otg)
+		s5p_ehci->otg->host = NULL;
+
+	s5p_ehci_clk_disable_unprepare(s5p_ehci);
 
 	usb_put_hcd(hcd);
 
@@ -216,6 +560,75 @@ static void s5p_ehci_shutdown(struct platform_device *pdev)
 	if (hcd->driver->shutdown)
 		hcd->driver->shutdown(hcd);
 }
+
+#ifdef CONFIG_PM_RUNTIME
+static int s5p_ehci_runtime_suspend(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct s5p_ehci_platdata *pdata = pdev->dev.platform_data;
+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+	struct s5p_ehci_hcd *s5p_ehci = to_s5p_ehci(hcd);
+	bool do_wakeup = device_may_wakeup(dev);
+	int rc;
+
+	dev_dbg(dev, "%s\n", __func__);
+
+	rc = ehci_suspend(hcd, do_wakeup);
+
+	if (s5p_ehci->phy)
+		pm_runtime_put_sync(s5p_ehci->phy->dev);
+	else if (pdata && pdata->phy_suspend)
+		pdata->phy_suspend(pdev, USB_PHY_TYPE_HOST);
+
+	return rc;
+}
+
+static int s5p_ehci_runtime_resume(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct s5p_ehci_platdata *pdata = pdev->dev.platform_data;
+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+	struct s5p_ehci_hcd *s5p_ehci = to_s5p_ehci(hcd);
+	int rc = 0;
+
+	if (dev->power.is_suspended)
+		return 0;
+
+	dev_dbg(dev, "%s\n", __func__);
+
+	if (s5p_ehci->phy) {
+		struct usb_phy *phy = s5p_ehci->phy;
+
+		if (s5p_ehci->post_lpa_resume)
+			usb_phy_init(phy);
+		pm_runtime_get_sync(phy->dev);
+	} else if (pdata && pdata->phy_resume) {
+		rc = pdata->phy_resume(pdev, USB_PHY_TYPE_HOST);
+		s5p_ehci->post_lpa_resume = !!rc;
+	}
+
+	if (s5p_ehci->post_lpa_resume)
+		s5p_ehci_configurate(hcd);
+
+	ehci_resume(hcd, false);
+
+	/*
+	 * REVISIT: in case of LPA bus won't be resumed, so we do it here.
+	 * Alternatively, we can try to setup HC in such a way that it starts
+	 * to sense connections. In this case, root hub will be resumed from
+	 * interrupt (ehci_irq()).
+	 */
+	if (s5p_ehci->post_lpa_resume)
+		usb_hcd_resume_root_hub(hcd);
+
+	s5p_ehci->post_lpa_resume = 0;
+
+	return 0;
+}
+#else
+#define s5p_ehci_runtime_suspend	NULL
+#define s5p_ehci_runtime_resume		NULL
+#endif
 
 #ifdef CONFIG_PM
 static int s5p_ehci_suspend(struct device *dev)
@@ -232,12 +645,15 @@ static int s5p_ehci_suspend(struct device *dev)
 	if (s5p_ehci->otg)
 		s5p_ehci->otg->set_host(s5p_ehci->otg, &hcd->self);
 
-	if (s5p_ehci->phy)
-		usb_phy_shutdown(s5p_ehci->phy);
-	else if (s5p_ehci->pdata->phy_exit)
+	if (s5p_ehci->phy) {
+		/* Shutdown PHY only if it wasn't shutdown before */
+		if (!s5p_ehci->post_lpa_resume)
+			usb_phy_shutdown(s5p_ehci->phy);
+	} else if (s5p_ehci->pdata->phy_exit) {
 		s5p_ehci->pdata->phy_exit(pdev, USB_PHY_TYPE_HOST);
+	}
 
-	clk_disable_unprepare(s5p_ehci->clk);
+	s5p_ehci_clk_disable_unprepare(s5p_ehci);
 
 	return rc;
 }
@@ -248,39 +664,110 @@ static int s5p_ehci_resume(struct device *dev)
 	struct  s5p_ehci_hcd *s5p_ehci = to_s5p_ehci(hcd);
 	struct platform_device *pdev = to_platform_device(dev);
 
-	clk_prepare_enable(s5p_ehci->clk);
+	s5p_ehci_clk_prepare_enable(s5p_ehci);
 
 	if (s5p_ehci->otg)
 		s5p_ehci->otg->set_host(s5p_ehci->otg, &hcd->self);
 
-	if (s5p_ehci->phy)
+	if (s5p_ehci->phy) {
 		usb_phy_init(s5p_ehci->phy);
-	else if (s5p_ehci->pdata->phy_init)
+		s5p_ehci->post_lpa_resume = 0;
+
+		/*
+		 * We are going to change runtime status to active.
+		 * Make sure we get the phy only if we didn't get it before.
+		 */
+		if (pm_runtime_suspended(dev))
+			pm_runtime_get_sync(s5p_ehci->phy->dev);
+	} else if (s5p_ehci->pdata->phy_init) {
 		s5p_ehci->pdata->phy_init(pdev, USB_PHY_TYPE_HOST);
+	}
 
 	/* DMA burst Enable */
 	writel(EHCI_INSNREG00_ENABLE_DMA_BURST, EHCI_INSNREG00(hcd->regs));
 
 	ehci_resume(hcd, false);
+
+	/* Update runtime PM status and clear runtime_error */
+	pm_runtime_disable(dev);
+	pm_runtime_set_active(dev);
+	pm_runtime_enable(dev);
+
 	return 0;
+}
+
+int s5p_ehci_bus_resume(struct usb_hcd *hcd)
+{
+	/* When suspend is failed, re-enable clocks & PHY */
+	pm_runtime_resume(hcd->self.controller);
+
+	return bus_resume(hcd);
 }
 #else
 #define s5p_ehci_suspend	NULL
 #define s5p_ehci_resume		NULL
+#define s5p_ehci_bus_resume	NULL
 #endif
 
 static const struct dev_pm_ops s5p_ehci_pm_ops = {
 	.suspend	= s5p_ehci_suspend,
 	.resume		= s5p_ehci_resume,
+	.runtime_suspend	= s5p_ehci_runtime_suspend,
+	.runtime_resume		= s5p_ehci_runtime_resume,
+};
+
+static const char *exynos5_ehci_clk_names[] = {"aclk", "aclk_axius", "aclk_ahb",
+		"aclk_ahb2axi", "sclk_usbhost20", "sclk_usb20phy_hsic",
+		"oscclk_phy", "freeclk", "phyclk", NULL};
+static const char *exynos7580_ehci_clk_names[] = {"otg_aclk", "xiu_d_fsys1", "ahb_usbhs",
+		"ahb2axi_usbhs", "upsizer_fsys1", "upsizer_ahb_usbhs", "usbhost20", NULL};
+
+static struct exynos_ehci_drvdata exynos4210_ehci_drvdata = {
+	.rpm_enable = 1,
+};
+
+static struct exynos_ehci_drvdata exynos5_ehci_drvdata = {
+	.clk_names = exynos5_ehci_clk_names,
+	.clk_size = ARRAY_SIZE(exynos5_ehci_clk_names),
+	.rpm_enable = 1,
+};
+
+static struct exynos_ehci_drvdata exynos7580_ehci_drvdata = {
+	.clk_names = exynos7580_ehci_clk_names,
+	.clk_size = ARRAY_SIZE(exynos7580_ehci_clk_names),
+	.rpm_enable = 0,
 };
 
 #ifdef CONFIG_OF
 static const struct of_device_id exynos_ehci_match[] = {
-	{ .compatible = "samsung,exynos4210-ehci" },
+	{
+		.compatible = "samsung,exynos4210-ehci",
+		.data = &exynos4210_ehci_drvdata,
+	}, {
+		.compatible = "samsung,exynos5",
+		.data = &exynos5_ehci_drvdata,
+	}, {
+		.compatible = "samsung,exynos7580-ehci",
+		.data = &exynos7580_ehci_drvdata,
+	},
 	{},
 };
 MODULE_DEVICE_TABLE(of, exynos_ehci_match);
 #endif
+
+static inline const struct exynos_ehci_drvdata
+*exynos_ehci_get_driver_data(struct platform_device *pdev)
+{
+	if (pdev->dev.of_node) {
+		const struct of_device_id *match;
+		match = of_match_node(exynos_ehci_match,
+						pdev->dev.of_node);
+		return match->data;
+	}
+
+	dev_err(&pdev->dev, "no device node specified and no driver data");
+	return NULL;
+}
 
 static struct platform_driver s5p_ehci_driver = {
 	.probe		= s5p_ehci_probe,
@@ -304,6 +791,10 @@ static int __init ehci_s5p_init(void)
 
 	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
 	ehci_init_driver(&s5p_ehci_hc_driver, &s5p_overrides);
+
+	bus_resume = s5p_ehci_hc_driver.bus_resume;
+	s5p_ehci_hc_driver.bus_resume = s5p_ehci_bus_resume;
+
 	return platform_driver_register(&s5p_ehci_driver);
 }
 module_init(ehci_s5p_init);

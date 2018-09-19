@@ -119,6 +119,10 @@ static void of_i2c_gpio_get_props(struct device_node *np,
 		of_property_read_bool(np, "i2c-gpio,scl-open-drain");
 	pdata->scl_is_output_only =
 		of_property_read_bool(np, "i2c-gpio,scl-output-only");
+#ifdef CONFIG_FIX_I2C_BUS_NUM
+	if (of_property_read_u32(np, "i2c-gpio,bus-num", &pdata->bus_num))
+		pdata->bus_num = -1;
+#endif
 }
 
 static int i2c_gpio_probe(struct platform_device *pdev)
@@ -219,7 +223,11 @@ static int i2c_gpio_probe(struct platform_device *pdev)
 	adap->dev.parent = &pdev->dev;
 	adap->dev.of_node = pdev->dev.of_node;
 
+#ifdef CONFIG_FIX_I2C_BUS_NUM
+	adap->nr = pdata->bus_num;
+#else
 	adap->nr = pdev->id;
+#endif
 	ret = i2c_bit_add_numbered_bus(adap);
 	if (ret)
 		goto err_add_bus;

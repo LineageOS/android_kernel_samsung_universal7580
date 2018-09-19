@@ -13,7 +13,7 @@ config VT
 	bool "Virtual terminal" if EXPERT
 	depends on !S390 && !UML
 	select INPUT
-	default y
+	default n
 	---help---
 	  If you say Y here, you will get support for terminal devices with
 	  display and keyboard devices. These are called "virtual" because you
