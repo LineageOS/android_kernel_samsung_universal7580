@@ -62,6 +62,10 @@
 #define SEC_INPUT_VOLTAGE_5V	5
 #define SEC_INPUT_VOLTAGE_9V	9
 
+#if defined(CONFIG_CAMERA_S5NEO)
+#define BATT_MISC_EVENT_UNDEFINED_RANGE_TYPE	0x00000001
+#endif
+
 struct adc_sample_info {
 	unsigned int cnt;
 	int total_adc;
@@ -260,6 +264,13 @@ struct sec_battery_info {
 #if defined(CONFIG_BATTERY_SMART)
 	bool detect_invalid_port;
 #endif
+#if defined(CONFIG_CAMERA_S5NEO)
+	struct mutex misclock;
+	unsigned int misc_event;
+	unsigned int prev_misc_event;
+	struct delayed_work misc_event_work;
+	struct wake_lock misc_event_wake_lock;
+#endif
 };
 
 ssize_t sec_bat_show_attrs(struct device *dev,
@@ -384,6 +395,9 @@ enum {
 	BATTERY_CYCLE,
 	FACTORY_MODE_RELIEVE,
 	FACTORY_MODE_BYPASS,
+#if defined(CONFIG_CAMERA_S5NEO)
+	BATT_MISC_EVENT,
+#endif
 };
 
 #ifdef CONFIG_OF

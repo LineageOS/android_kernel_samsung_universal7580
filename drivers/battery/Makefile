@@ -1,4 +1,8 @@
+ifdef CONFIG_CAMERA_S5NEO
+obj-$(CONFIG_BATTERY_SAMSUNG)	+= sec_battery_s5neo.o
+else
 obj-$(CONFIG_BATTERY_SAMSUNG)	+= sec_battery.o
+endif
 obj-$(CONFIG_OF)		+= sec_adc.o
 obj-$(CONFIG_BATTERY_SMART)	+= smart_battery.o
 obj-$(CONFIG_FUELGAUGE_MAX17042)	+= max17042_fuelgauge.o sec_fuelgauge.o
