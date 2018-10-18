@@ -21,6 +21,9 @@
 #define	DEBUG_LOG_MAGIC	(0xaabbccdd)
 #define	DEBUG_LOG_ENTRY_SIZE	128
 
+#define TIMA_DEBUG_LOG_SIZE 1<<18
+#define TIMA_SEC_LOG_SIZE 0x7000
+
 typedef struct debug_log_entry_s
 {
 	uint32_t	timestamp;          /* timestamp at which log entry was made*/

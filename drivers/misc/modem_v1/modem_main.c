@@ -51,6 +51,7 @@
 
 #define FMT_WAKE_TIME   (HZ/2)
 #define RAW_WAKE_TIME   (HZ*6)
+#define NET_WAKE_TIME   (HZ/2)
 
 static struct modem_shared *create_modem_shared_data(
 				struct platform_device *pdev)
@@ -237,6 +238,10 @@ static int attach_devices(struct io_device *iod, enum modem_link tx_link)
 
 	case SIPC5_CH_ID_BOOT_0 ... SIPC5_CH_ID_DUMP_9:
 		iod->waketime = RAW_WAKE_TIME;
+		break;
+
+	case SIPC_CH_ID_PDP_0 ... SIPC_CH_ID_LOOPBACK2:
+		iod->waketime = NET_WAKE_TIME;
 		break;
 
 	default:
