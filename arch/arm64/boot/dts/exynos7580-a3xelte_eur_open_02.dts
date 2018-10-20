@@ -1370,21 +1370,13 @@ i2c@33 {
 		status = "okay";
 	};
 
-	pinctrl@139B0000 {
-		bt_en_2: bt-en-2 {
-			samsung,pins = "gpa1-6";
-			samsung,pin-function = <1>;
-			samsung,pin-pud = <0>;
-		};
-	};
-
 	bluetooth {
 		compatible = "broadcom,bcm43xx";
 		gpios = <&gpa1 6 0x1	/*BT_EN*/
 				&gpa2 2 0x1	/*BT_WAKE*/
 				&gpa2 6 0xF	/*BT_HOST_WAKE*/ >;
 		pinctrl-names = "default";
-		pinctrl-0=<&bt_hostwake &bt_btwake &bt_en_2>;
+		pinctrl-0=<&bt_hostwake &bt_btwake &bt_en>;
 		status = "okay";
 	};
 

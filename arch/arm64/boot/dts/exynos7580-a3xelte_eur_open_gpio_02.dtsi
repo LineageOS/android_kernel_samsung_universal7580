@@ -202,7 +202,7 @@
 		PIN_SLP(gpe0-2, INPUT, DOWN);	/* FLASH_LED_STROBE */
 		PIN_SLP(gpe0-3, INPUT, DOWN);	/* VTCAM_RST_N */
 		PIN_SLP(gpe0-4, INPUT, DOWN);	/* CAM_RST */
-		PIN_SLP(gpe0-5, INPUT, DOWN);	/* OIS_RST */
+		PIN_SLP(gpe0-5, INPUT, DOWN);	/* NC */
 		PIN_SLP(gpe0-6, PREV, NONE);	/* CP_RST_N */
 		PIN_SLP(gpe0-7, OUT0, DOWN);	/* GRIP_EN */
 
