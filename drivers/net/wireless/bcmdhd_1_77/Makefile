@@ -303,18 +303,8 @@ ifeq ($(CONFIG_WLAN_VHTDISABLE),y)
 DHDCFLAGS += -DDHD_DISABLE_VHTMODE
 endif
 
-# Android Version Check from Platform source
-ifneq ($(PLATFORM_VERSION),)
-MAJOR_VERSION := $(shell echo $(PLATFORM_VERSION) | cut -d "." -f 1)
-DHDCFLAGS += -DANDROID_PLATFORM_VERSION=$(MAJOR_VERSION)
-endif
-
-ifneq ($(PLATFORM_VERSION),)
 # Android O-OS (version 8) support
-ifeq ($(shell expr $(PLATFORM_VERSION) \>= 8.0),1)
 DHDCFLAGS += -DCUSTOM_ASSOC_TIMEOUT=20
-endif
-endif
 
 # Use Legacy dump path
 ifneq ($(USE_LEGACY_DUMP_PATH),)
@@ -476,14 +466,6 @@ endif
 # Generate .softap.info
   DHDCFLAGS += -DGEN_SOFTAP_INFO_FILE
 
-ifneq ($(PLATFORM_VERSION),)
-# DREAM Android N OS should not use below features
-ifeq ($(shell expr $(PLATFORM_VERSION) \< 8.0),1)
-ifneq ($(filter y,$(CONFIG_WLAN_GREAT) $(CONFIG_SEC_GREATQLTE_PROJECT)),y)
- DREAM_NOS_DISCARD_FEATURES := y
-endif
-endif
-
 # Feature Set used for GREAT N OS and Android O OS
 ifneq ($(DREAM_NOS_DISCARD_FEATURES),y)
 # Debugaility
@@ -497,7 +479,7 @@ ifneq ($(DREAM_NOS_DISCARD_FEATURES),y)
 # LAST ROAM EVENT LOG
   DHDCFLAGS += -DWL_LASTEVT
 # Use single nvram file
-  DHDCFLAGS += -DDHD_USE_SINGLE_NVRAM_FILE
+  #DHDCFLAGS += -DDHD_USE_SINGLE_NVRAM_FILE
 #STAT REPORT
 #stat report shall be defined only if LINK STAT is defined
   DHDCFLAGS += -DSTAT_REPORT
@@ -508,13 +490,10 @@ ifneq ($(DREAM_NOS_DISCARD_FEATURES),y)
 endif
 
 # RSSI_SUM_REPORT is used over Android O OS only
-ifeq ($(shell expr $(PLATFORM_VERSION) \>= 8.0),1)
 # RSSI Logging
   DHDCFLAGS += -DSUPPORT_RSSI_SUM_REPORT
 # Enable NDO_CONFIG_SUPPORT in HAL
   DHDCFLAGS += -DNDO_CONFIG_SUPPORT
-endif
-endif
 
 # For Samsung factory mode only
 ifeq ($(CONFIG_SEC_FACTORY),y)
@@ -894,13 +873,9 @@ endif
   DHDCFLAGS += -DCUSTOM_ROAM_TIME_THRESH_IN_SUSPEND=6000
   DHDCFLAGS += -DMAX_DTIM_ALLOWED_INTERVAL=925
 
-ifneq ($(PLATFORM_VERSION),)
 # Android O OS use below features
-ifeq ($(shell expr $(PLATFORM_VERSION) \>= 8.0),1)
 # Use single nvram file
-  DHDCFLAGS += -DDHD_USE_SINGLE_NVRAM_FILE
-endif
-endif
+  #DHDCFLAGS += -DDHD_USE_SINGLE_NVRAM_FILE
 
 ifneq ($(filter y,$(CONFIG_BCM43455) $(CONFIG_BCM43456)),$(filter m,$(CONFIG_BCM43455) $(CONFIG_BCM43456)))
 # Enable Firmware Coredump
@@ -1062,13 +1037,9 @@ endif
   DHDCFLAGS :=$(filter-out -DSUPPORT_P2P_GO_PS,$(DHDCFLAGS))
 # Generate .softap.info
   DHDCFLAGS += -DGEN_SOFTAP_INFO_FILE
-ifneq ($(PLATFORM_VERSION),)
 # Android O OS use below features
-ifeq ($(shell expr $(PLATFORM_VERSION) \>= 8.0),1)
 # Use single nvram file
-  DHDCFLAGS += -DDHD_USE_SINGLE_NVRAM_FILE
-endif
-endif
+  #DHDCFLAGS += -DDHD_USE_SINGLE_NVRAM_FILE
 endif
 
 ifneq ($(CONFIG_BCM43012),)

@@ -9459,10 +9459,10 @@ bool dhd_update_fw_nv_path(dhd_info_t *dhdinfo)
 	/* set default firmware and nvram path for built-in type driver */
 	if (!dhd_download_fw_on_driverload) {
 #ifdef CONFIG_BCMDHD_FW_PATH
-		fw = VENDOR_PATH CONFIG_BCMDHD_FW_PATH;
+		fw = CONFIG_BCMDHD_FW_PATH;
 #endif /* CONFIG_BCMDHD_FW_PATH */
 #ifdef CONFIG_BCMDHD_NVRAM_PATH
-		nv = VENDOR_PATH CONFIG_BCMDHD_NVRAM_PATH;
+		nv = CONFIG_BCMDHD_NVRAM_PATH;
 #endif /* CONFIG_BCMDHD_NVRAM_PATH */
 	}
 
@@ -19242,7 +19242,7 @@ void
 dhd_set_blob_support(dhd_pub_t *dhdp, char *fw_path)
 {
 	struct file *fp;
-	char *filepath = VENDOR_PATH CONFIG_BCMDHD_CLM_PATH;
+	char *filepath = CONFIG_BCMDHD_CLM_PATH;
 
 	fp = filp_open(filepath, O_RDONLY, 0);
 	if (IS_ERR(fp)) {

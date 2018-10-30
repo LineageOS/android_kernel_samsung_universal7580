@@ -4867,7 +4867,7 @@ dhd_apply_default_clm(dhd_pub_t *dhd, char *clm_path)
 		clm_blob_path = clm_path;
 		DHD_TRACE(("clm path from module param:%s\n", clm_path));
 	} else {
-		clm_blob_path = VENDOR_PATH CONFIG_BCMDHD_CLM_PATH;
+		clm_blob_path = CONFIG_BCMDHD_CLM_PATH;
 	}
 
 	/* If CLM blob file is found on the filesystem, download the file.
@@ -4965,7 +4965,7 @@ exit:
 #ifdef PLATFORM_SLP
 #define CLMINFO_PATH PLATFORM_PATH".clminfo"
 #else
-#define CLMINFO_PATH VENDOR_PATH"/etc/wifi/.clminfo"
+#define CLMINFO_PATH "/etc/wifi/.clminfo"
 #endif /* PLATFORM_SLP */
 #else
 #define CLMINFO_PATH "/installmedia/.clminfo"
@@ -5033,10 +5033,6 @@ dhd_get_clminfo(dhd_pub_t *dhd, char *clm_path)
 	char tokdelim;
 	int parse_step = 0;
 
-	char *clm_blob_vendor_path = VENDOR_PATH;
-	char *clm_blob_path = NULL;
-	int clm_blob_path_len = 0;
-
 	/* Clears clm_path and translate_custom_table */
 	memset(clm_path, 0, MOD_PARAM_PATHLEN);
 	memset(translate_custom_table, 0, sizeof(translate_custom_table));
@@ -5079,22 +5075,6 @@ dhd_get_clminfo(dhd_pub_t *dhd, char *clm_path)
 		/* read clm_path */
 		strncpy(clm_path, temp_buf, str_ln);
 		len -= (strlen(clm_path) + 1);
-
-		clm_blob_path_len = strlen(clm_path);
-		clm_blob_path = (char *)MALLOCZ(dhd->osh, clm_blob_path_len);
-		if (clm_blob_path == NULL) {
-			bcmerror = BCME_NOMEM;
-			DHD_ERROR(("%s: Failed to allocate memory!\n", __FUNCTION__));
-			goto out;
-		}
-		memset(clm_blob_path, 0, clm_blob_path_len);
-		strncpy(clm_blob_path, clm_path, strlen(clm_path));
-
-		/* Concannate VENDOR_PATH + CLM_PATH */
-		memset(clm_path, 0, MOD_PARAM_PATHLEN);
-		snprintf(clm_path, (int)strlen(clm_blob_vendor_path) + clm_blob_path_len + 1,
-			"%s%s", clm_blob_vendor_path, clm_blob_path);
-		clm_path[strlen(clm_path)] = '\0';
 
 		DHD_INFO(("%s: Found clm_path %s\n", __FUNCTION__, clm_path));
 
@@ -5173,9 +5153,6 @@ dhd_get_clminfo(dhd_pub_t *dhd, char *clm_path)
 		} while (len > 0);
 	}
 out:
-	if (clm_blob_path) {
-		MFREE(dhd->osh, clm_blob_path, clm_blob_path_len);
-	}
 	if (memblock) {
 		dhd_free_download_buffer(dhd, memblock, MAX_CLMINFO_BUF_SIZE);
 	}
