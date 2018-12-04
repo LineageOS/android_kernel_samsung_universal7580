@@ -1379,7 +1379,7 @@ i2c@33 {
 	};
 
 	bluetooth {
-		compatible = "broadcom,bcm43455";
+		compatible = "broadcom,bcm43xx";
 		gpios = <&gpa1 6 0x1	/*BT_EN*/
 				&gpa2 2 0x1	/*BT_WAKE*/
 				&gpa2 6 0xF	/*BT_HOST_WAKE*/ >;

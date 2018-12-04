@@ -237,6 +237,7 @@
 		battery,self_discharging_temp_pollingtime = <400>;
 
 		/*swelling setting*/
+		battery,swelling_low_temp_2step_mode = <1>;
 		battery,swelling_high_temp_block = <410>;
 		battery,swelling_high_temp_recov = <390>;
 		battery,swelling_low_temp_block_1st = <150>;

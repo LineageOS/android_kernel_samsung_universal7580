@@ -1268,11 +1268,15 @@ static bool sec_bat_set_aging_step(struct sec_battery_info *battery, int step)
 		battery->pdata->age_data[battery->pdata->age_step].full_condition_soc;
 	battery->pdata->full_condition_vcell =
 		battery->pdata->age_data[battery->pdata->age_step].full_condition_vcell;
-
+#if defined(CONFIG_FUELGAUGE_S2MU003)
+	value.intval = battery->pdata->age_step;
+	psy_do_property(battery->pdata->fuelgauge_name, set,
+		POWER_SUPPLY_PROP_UPDATE_BATTERY_DATA, value);
+#else
 	value.intval = battery->pdata->full_condition_soc;
 	psy_do_property(battery->pdata->fuelgauge_name, set,
 		POWER_SUPPLY_PROP_CAPACITY_LEVEL, value);
-
+#endif
 	dev_info(battery->dev,
 		 "%s: Step(%d/%d), Cycle(%d), float_v(%d), r_v(%d), f_s(%d), f_vl(%d)\n",
 		 __func__,
@@ -1303,7 +1307,8 @@ static void sec_bat_aging_check(struct sec_battery_info *battery)
 		if (battery->pdata->age_data[calc_step].cycle <= battery->batt_cycle)
 			break;
 	}
-
+	dev_info(battery->dev,
+		 "%s: [Long life] prev_step = %d, calc_step = %d\n",  __func__, prev_step, calc_step);
 	if (calc_step == prev_step)
 		return;
 
@@ -4421,7 +4426,9 @@ ssize_t sec_bat_store_attrs(
 				prev_battery_cycle = battery->batt_cycle;
 				battery->batt_cycle = x;
 #if defined(CONFIG_BATTERY_AGE_FORECAST)
+				dev_info(battery->dev, "%s: [Long life] prev_battery_cycle = %d, new bat. cycle = %d\n", __func__, prev_battery_cycle, battery->batt_cycle);
 				if (prev_battery_cycle < 0) {
+					dev_info(battery->dev, "%s: [Long life] Do sec_bat_aging_check()\n", __func__);
 					sec_bat_aging_check(battery);
 				}
 #endif
@@ -6004,6 +6011,11 @@ static int sec_bat_parse_dt(struct device *dev,
 	if (ret)
 		pr_info("%s: chg_float_voltage is Empty\n", __func__);
 
+	ret = of_property_read_u32(np, "battery,chg_float_voltage",
+		(unsigned int *)&pdata->chg_float_voltage);
+	if (ret)
+		pr_info("%s: chg_float_voltage is Empty\n", __func__);
+
 	ret = of_property_read_u32(np, "battery,swelling_high_temp_block",
 				   &temp);
 	pdata->swelling_high_temp_block = (int)temp;
@@ -6052,29 +6064,53 @@ static int sec_bat_parse_dt(struct device *dev,
 	if (ret)
 		pr_info("%s: swelling_low_rechg_voltage is Empty\n", __func__);
 
-	ret = of_property_read_u32(np, "battery,swelling_low_temp_block_1st",
-				   &temp);
-	pdata->swelling_low_temp_block_1st = (int)temp;
-	if (ret)
-		pr_info("%s: swelling low temp block is Empty\n", __func__);
+	ret = of_property_read_u32(np, "battery,swelling_low_temp_2step_mode",
+				   &pdata->swelling_low_temp_2step_mode);
+	if (ret) {
+		pr_info("%s: swelling_low_temp_2step_mode is Empty\n", __func__);
+		pdata->swelling_low_temp_2step_mode = 0;
+	}
 
-	ret = of_property_read_u32(np, "battery,swelling_low_temp_recov_1st",
-				   &temp);
-	pdata->swelling_low_temp_recov_1st = (int)temp;
-	if (ret)
-		pr_info("%s: swelling low temp recovery is Empty\n", __func__);
+	if(pdata->swelling_low_temp_2step_mode) {
+		ret = of_property_read_u32(np, "battery,swelling_low_temp_block_1st",
+					   &temp);
+		pdata->swelling_low_temp_block_1st = (int)temp;
+		if (ret)
+			pr_info("%s: swelling low temp block is Empty\n", __func__);
 
-	ret = of_property_read_u32(np, "battery,swelling_low_temp_block_2nd",
-				   &temp);
-	pdata->swelling_low_temp_block_2nd = (int)temp;
-	if (ret)
-		pr_info("%s: swelling low temp block is Empty\n", __func__);
+		ret = of_property_read_u32(np, "battery,swelling_low_temp_recov_1st",
+					   &temp);
+		pdata->swelling_low_temp_recov_1st = (int)temp;
+		if (ret)
+			pr_info("%s: swelling low temp recovery is Empty\n", __func__);
 
-	ret = of_property_read_u32(np, "battery,swelling_low_temp_recov_2nd",
+		ret = of_property_read_u32(np, "battery,swelling_low_temp_block_2nd",
+					   &temp);
+		pdata->swelling_low_temp_block_2nd = (int)temp;
+		if (ret)
+			pr_info("%s: swelling low temp block is Empty\n", __func__);
+
+		ret = of_property_read_u32(np, "battery,swelling_low_temp_recov_2nd",
+					   &temp);
+		pdata->swelling_low_temp_recov_2nd = (int)temp;
+		if (ret)
+			pr_info("%s: swelling low temp recovery 2nd is Empty\n", __func__);
+	}
+	else {
+		ret = of_property_read_u32(np, "battery,swelling_low_temp_block",
 				   &temp);
-	pdata->swelling_low_temp_recov_2nd = (int)temp;
-	if (ret)
-		pr_info("%s: swelling low temp recovery 2nd is Empty\n", __func__);
+		pdata->swelling_low_temp_block_1st = (int)temp;
+		pdata->swelling_low_temp_block_2nd = (int)temp;
+		if (ret)
+			pr_info("%s: swelling low temp block is Empty\n", __func__);
+
+		ret = of_property_read_u32(np, "battery,swelling_low_temp_recov",
+				   &temp);
+		pdata->swelling_low_temp_recov_1st = (int)temp;
+		pdata->swelling_low_temp_recov_2nd = (int)temp;
+		if (ret)
+			pr_info("%s: swelling low temp recovery is Empty\n", __func__);	
+	}
 
 	ret = of_property_read_u32(np, "battery,swelling_low_temp_current", 
 					&pdata->swelling_low_temp_current);

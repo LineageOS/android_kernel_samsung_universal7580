@@ -21,7 +21,7 @@
 	model_info-chip = <7580>;
 	model_info-platform = "android";
 	model_info-subtype = "samsung";
-	model_info-hw_rev = <0>;
+	model_info-hw_rev = <2>;
 	model_info-hw_rev_end = <9>;
 	compatible = "samsung,exynos7580-universal7580,r01", "samsung,exynos7580";
 
@@ -1624,7 +1624,7 @@
 		key-gpio = <&gpa1 1 0>;
 	/*	ext-detchip-en-gpio = <310>; */
 	/*	key-dbtime = <100>; */
-		det-dbtime = <50>;
+	/*	det-dbtime = <50>; */
 	/*	send-end-active-high; */
 		det-zones-list = <&det_zones 0 10000 10 0>,
 			<&det_zones 1701 10000 10 2>,

@@ -558,7 +558,11 @@
 			cm36655,default_low_thd = <13>;
 			cm36655,cancel_hi_thd = <10>;
 			cm36655,cancel_low_thd = <7>;
-			cm36655,trim = <0x0003>;
+			cm36655,cal_skip_adc=<8>;
+			cm36655,cal_fail_adc=<18>;
+			cm36655,als_reg_set=<0x0000>;
+			cm36655,ps_conf1=<0x7308>;
+			cm36655,default_trim = <0x0003>;
 		};
 	};
 
@@ -1334,7 +1338,7 @@
 	/*	send-end-active-high; */
 		det-zones-list = <&det_zones 0 10000 10 0>,
 			<&det_zones 1700 10000 10 2>,
-			<&det_zones 1701 10000 10 1>,
+			<&det_zones 3800 10000 10 1>,
 			<&det_zones 9999 10000 10 1>;
 		but-zones-list = <&but_zones 226 1 710>,
 			<&but_zones 582 711 768>,

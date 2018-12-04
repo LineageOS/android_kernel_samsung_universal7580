@@ -110,7 +110,7 @@
 		battery,input_current_limit = <1500 0 0 1500 460 900 1000 460 1000 0 760 1450 1500 0 0 400 700 1300 300 1000 1500 0 1450 1000 1500 80 1500 1500 1400 450>;
 		battery,fast_charging_current = <2000 0 0 2000 460 1200 1000 460 1200 0 900 1600 2000 0 0 400 700 1300 300 1000 1900 0 2000 1000 2000 80 1800 1000 1400 450>;
 		battery,full_check_current_1st = <200 0 0 200 200 200 200 200 200 0 200 200 200 0 0 200 200 200 200 200 200 0 200 200 200 0 200 200 200 200>;
-		battery,full_check_current_2nd = <2400 0 0 2400 2400 2400 2400 2400 2400 0 2400 2400 2400 0 0 2400 2400 2400 2400 2400 2400 0 2400 2400 2400 2400 2400 2400 2400 2400>;
+		battery,full_check_current_2nd = <100 0 0 100 100 100 100 100 100 0 100 100 100 0 0 100 100 100 100 100 100 0 100 100 100 0 100 100 100 100>;
 
 		battery,inbat_voltage = <0>;
 		battery,inbat_voltage_table_adc = <3120 3101 3061 3038 3001 2956 2920 2887 2856 2814
@@ -156,7 +156,7 @@
 		battery,temp_low_threshold_lpm = <(-50)>;
 		battery,temp_low_recovery_lpm = <0>;
 		battery,full_check_type = <7>; /* SEC_BATTERY_FULLCHARGED_CHGPSY */
-		battery,full_check_type_2nd = <3>; /* SEC_BATTERY_FULLCHARGED_TIME */
+		battery,full_check_type_2nd = <7>; /* SEC_BATTERY_FULLCHARGED_CHGPSY */
 		battery,full_check_count = <1>;
 		battery,chg_gpio_full_check = <0>;
 		battery,chg_polarity_full_check = <1>;
@@ -203,6 +203,8 @@
 		battery,swelling_high_rechg_voltage = <4150>;
 		battery,swelling_low_rechg_voltage = <4050>;
 		battery,swelling_block_time = <600>;
+		battery,swelling_high_temp_topoff = <200>;
+		battery,swelling_low_temp_topoff = <200>;
 	};
 
 	i2c@49 {

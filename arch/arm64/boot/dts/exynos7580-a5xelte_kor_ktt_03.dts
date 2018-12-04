@@ -10,7 +10,7 @@
  */
 
 /dts-v1/;
-#include "exynos7580-reserve-2000MB-Ax.dtsi"
+#include "exynos7580-reserve-2000MB-Ax_01.dtsi"
 #include "exynos7580-a5xelte_common.dtsi"
 #include "modem-carmen2-reserve-2000MB.dtsi"
 #include "exynos7580-a5xelte_battery_00.dtsi"

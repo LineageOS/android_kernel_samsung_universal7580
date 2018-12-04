@@ -17,6 +17,7 @@
 		PIN_IN(gpa0-0, DOWN, LV1);	/* NC */
 		PIN_IN(gpa0-7, NONE, LV1);	/* NC */
 		PIN_IN(gpa1-0, NONE, LV1);	/* SPK_INT */
+		PIN_IN(gpa3-4, NONE, LV1);	/* VODA_OPEN */
 	};
 };
 

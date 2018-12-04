@@ -1,7 +1,7 @@
 /*
  * Customer HW 4 dependant file
  *
- * Copyright (C) 1999-2016, Broadcom Corporation
+ * Copyright (C) 1999-2017, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -42,12 +42,6 @@
 struct dhd_info;
 extern int _dhd_set_mac_address(struct dhd_info *dhd,
 	int ifidx, struct ether_addr *addr);
-
-struct cntry_locales_custom {
-	char iso_abbrev[WLC_CNTRY_BUF_SZ]; /* ISO 3166-1 country abbreviation */
-	char custom_locale[WLC_CNTRY_BUF_SZ]; /* Custom firmware locale */
-	int32 custom_locale_rev; /* Custom local revisin default -1 */
-};
 
 /* Locale table for sec */
 const struct cntry_locales_custom translate_custom_table[] = {
@@ -99,7 +93,7 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"",   "XZ", 1},	/* Universal if Country code is unknown or empty */
 	{"IR", "XZ", 1},	/* Universal if Country code is IRAN, (ISLAMIC REPUBLIC OF) */
 	{"SD", "XZ", 1},	/* Universal if Country code is SUDAN */
-	{"SY", "XZ", 1},	/* Universal if Country code is SYRIAN ARAB REPUBLIC */
+	{"SY", "XZ", 11},	/* Universal if Country code is SYRIAN ARAB REPUBLIC */
 	{"GL", "XZ", 1},	/* Universal if Country code is GREENLAND */
 	{"PS", "XZ", 1},	/* Universal if Country code is PALESTINIAN TERRITORY, OCCUPIED */
 	{"TL", "XZ", 1},	/* Universal if Country code is TIMOR-LESTE (EAST TIMOR) */
@@ -180,7 +174,6 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"MH", "XZ", 11},	/* Universal if Country code is MARSHALL ISLANDS */
 	{"GL", "GP", 2},
 	{"AL", "AL", 2},
-	{"DZ", "GB", 6},
 	{"AS", "AS", 12},
 	{"AI", "AI", 1},
 	{"AF", "AD", 0},
@@ -189,10 +182,6 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"AW", "AW", 2},
 	{"AU", "AU", 6},
 	{"AT", "AT", 4},
-#if defined(BCM43454_CHIP) || defined(BCM43455_CHIP)
-	{"AM", "AM", 1},
-	{"MY", "MY", 19},
-#endif /* BCM43454_CHIP || BCM43455 */
 	{"AZ", "AZ", 2},
 	{"BS", "BS", 2},
 	{"BH", "BH", 4},
@@ -279,7 +268,6 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"LK", "LK", 1},
 	{"SE", "SE", 4},
 	{"CH", "CH", 4},
-	{"TW", "TW", 1},
 	{"TH", "TH", 5},
 	{"TT", "TT", 3},
 #if defined(DHD_SUPPORT_TR_212)
@@ -299,13 +287,20 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"SV", "SV", 25},
 	{"KR", "KR", 70},
 #if defined(BCM4354_CHIP) || defined(BCM43454_CHIP) || defined(BCM43455_CHIP)
+	{"TW", "TW", 65},
+	{"AM", "AM", 1},
 	{"JP", "JP", 968},
 	{"RU", "RU", 986},
 	{"UA", "UA", 16},
+	{"MY", "MY", 19},
+	{"DZ", "DZ", 2},
 #else
+	{"TW", "TW", 1},
 	{"JP", "JP", 45},
 	{"RU", "RU", 13},
 	{"UA", "UA", 8},
+	{"MY", "MY", 3},
+	{"DZ", "GB", 6},
 #endif /* BCM4354_CHIP || BCM43454_CHIP || BCM43455_CHIP */
 	{"GT", "GT", 1},
 	{"MN", "MN", 1},
@@ -355,20 +350,20 @@ void get_customized_country_code(void *adapter, char *country_iso_code, wl_count
 	return;
 }
 
+#define CIDINFO     PLATFORM_PATH".cid.info"
+#define PSMINFO     PLATFORM_PATH".psm.info"
+#define MACINFO     PLATFORM_PATH".mac.info"
+#define REVINFO     PLATFORM_PATH".rev"
+#define ANTINFO     PLATFORM_PATH".ant.info"
+#define WIFIVERINFO PLATFORM_PATH".wifiver.info"
+
 #ifdef PLATFORM_SLP
-#define MACINFO_EFS "/csa/.mac.info"
-#define WRMAC_BUF_SIZE 19
+#define MACINFO_EFS     NULL
+#define WRMAC_BUF_SIZE  19
 #else
-#define MACINFO_EFS "/efs/wifi/.mac.info"
-#define WRMAC_BUF_SIZE 18
+#define MACINFO_EFS     "/efs/wifi/.mac.info"
+#define WRMAC_BUF_SIZE  18
 #endif /* PLATFORM_SLP */
-#define MACINFO PLATFORM_PATH".mac.info"
-#define REVINFO PLATFORM_PATH".rev"
-#define CIDINFO PLATFORM_PATH".cid.info"
-#define PSMINFO PLATFORM_PATH".psm.info"
-#define ANTINFO PLATFORM_PATH".ant.info"
-#define WIFIVERINFO     PLATFORM_PATH".wifiver.info"
-#define NVMACINFO       PLATFORM_PAHT".nvmac.info"
 
 #ifdef BCM4330_CHIP
 #define CIS_BUF_SIZE            128
@@ -516,7 +511,7 @@ int dhd_write_rdwr_macaddr(struct ether_addr *mac)
 		set_fs(oldfs);
 		filp_close(fp_mac, NULL);
 	}
-	/* .mac.info will be created */
+	/* /data/.mac.info will be created */
 	fp_mac = filp_open(filepath_data, O_RDWR | O_CREAT, 0666);
 	if (IS_ERR(fp_mac)) {
 		DHD_ERROR(("[WIFI_SEC] %s: File open error\n", filepath_efs));
@@ -860,7 +855,8 @@ static int dhd_write_cid_file(const char *filepath_cid, const char *buf, int buf
 	/* File is always created. */
 	fp = filp_open(filepath_cid, O_RDWR | O_CREAT, 0666);
 	if (IS_ERR(fp)) {
-		DHD_ERROR(("[WIFI_SEC] %s: File open error\n", filepath_cid));
+		DHD_ERROR(("[WIFI_SEC] %s: File open err %ld\n",
+			filepath_cid, PTR_ERR(fp)));
 		return -1;
 	} else {
 		oldfs = get_fs();
@@ -1226,7 +1222,7 @@ startwrite:
 		mac->octet[0], mac->octet[1], mac->octet[2],
 		mac->octet[3], mac->octet[4], mac->octet[5]);
 
-	/* File will be created .mac.info. */
+	/* File will be created /data/.mac.info. */
 	fp_mac = filp_open(filepath_data, O_RDWR | O_CREAT, 0666);
 
 	if (IS_ERR(fp_mac)) {
@@ -1259,7 +1255,7 @@ startwrite:
 	}
 
 	filp_close(fp_mac, NULL);
-	/* end of .mac.info */
+	/* end of /data/.mac.info */
 
 	if (filepath_efs == NULL) {
 		DHD_ERROR(("[WIFI_SEC] %s : no efs filepath", __func__));
@@ -1312,7 +1308,6 @@ void sec_control_pm(dhd_pub_t *dhd, uint *power_mode)
 	struct file *fp = NULL;
 	char *filepath = PSMINFO;
 	char power_val = 0;
-	char iovbuf[WL_EVENTING_MASK_LEN + 12];
 #ifdef DHD_ENABLE_LPC
 	int ret = 0;
 	uint32 lpc = 0;
@@ -1325,9 +1320,9 @@ void sec_control_pm(dhd_pub_t *dhd, uint *power_mode)
 		/* Enable PowerSave Mode */
 		dhd_wl_ioctl_cmd(dhd, WLC_SET_PM, (char *)power_mode,
 			sizeof(uint), TRUE, 0);
-		DHD_ERROR(("[WIFI_SEC] %s: %s open failed,"
+		DHD_ERROR(("[WIFI_SEC] %s: /data/.psm.info open failed,"
 			" so set PM to %d\n",
-			__FUNCTION__, filepath, *power_mode));
+			__FUNCTION__, *power_mode));
 		return;
 	} else {
 		kernel_read(fp, fp->f_pos, &power_val, 1);
@@ -1342,23 +1337,18 @@ void sec_control_pm(dhd_pub_t *dhd, uint *power_mode)
 			dhd_wl_ioctl_cmd(dhd, WLC_SET_PM, (char *)power_mode,
 				sizeof(uint), TRUE, 0);
 			/* Turn off MPC in AP mode */
-			bcm_mkiovar("mpc", (char *)power_mode, 4,
-				iovbuf, sizeof(iovbuf));
-			dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf,
-				sizeof(iovbuf), TRUE, 0);
+			dhd_iovar(dhd, 0, "mpc", (char *)power_mode, sizeof(*power_mode), NULL, 0,
+					TRUE);
 			g_pm_control = TRUE;
 #ifdef ROAM_ENABLE
 			/* Roaming off of dongle */
-			bcm_mkiovar("roam_off", (char *)&roamvar, 4,
-				iovbuf, sizeof(iovbuf));
-			dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf,
-				sizeof(iovbuf), TRUE, 0);
+			dhd_iovar(dhd, 0, "roam_off", (char *)&roamvar, sizeof(roamvar), NULL, 0,
+					TRUE);
 #endif
 #ifdef DHD_ENABLE_LPC
 			/* Set lpc 0 */
-			bcm_mkiovar("lpc", (char *)&lpc, 4, iovbuf, sizeof(iovbuf));
-			if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf,
-				sizeof(iovbuf), TRUE, 0)) < 0) {
+			ret = dhd_iovar(dhd, 0, "lpc", (char *)&lpc, sizeof(lpc), NULL, 0, TRUE);
+			if (ret < 0) {
 				DHD_ERROR(("[WIFI_SEC] %s: Set lpc failed  %d\n",
 				__FUNCTION__, ret));
 			}
@@ -1382,7 +1372,6 @@ int dhd_sel_ant_from_file(dhd_pub_t *dhd)
 	uint32 ant_val = 0;
 	uint32 btc_mode = 0;
 	char *filepath = ANTINFO;
-	char iovbuf[WLC_IOCTL_SMLEN];
 	uint chip_id = dhd_bus_chip_id(dhd);
 
 	/* Check if this chip can support MIMO */
@@ -1423,8 +1412,8 @@ int dhd_sel_ant_from_file(dhd_pub_t *dhd)
 
 	/* bt coex mode off */
 	if (dhd_get_fw_mode(dhd->info) == DHD_FLAG_MFG_MODE) {
-		bcm_mkiovar("btc_mode", (char *)&btc_mode, 4, iovbuf, sizeof(iovbuf));
-		ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+		ret = dhd_iovar(dhd, 0, "btc_mode", (char *)&btc_mode, sizeof(btc_mode), NULL, 0,
+				TRUE);
 		if (ret) {
 			DHD_ERROR(("[WIFI_SEC] %s: Fail to execute dhd_wl_ioctl_cmd(): "
 				"btc_mode, ret=%d\n",
@@ -1434,16 +1423,14 @@ int dhd_sel_ant_from_file(dhd_pub_t *dhd)
 	}
 
 	/* Select Antenna */
-	bcm_mkiovar("txchain", (char *)&ant_val, 4, iovbuf, sizeof(iovbuf));
-	ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+	ret = dhd_iovar(dhd, 0, "txchain", (char *)&ant_val, sizeof(ant_val), NULL, 0, TRUE);
 	if (ret) {
 		DHD_ERROR(("[WIFI_SEC] %s: Fail to execute dhd_wl_ioctl_cmd(): txchain, ret=%d\n",
 			__FUNCTION__, ret));
 		return ret;
 	}
 
-	bcm_mkiovar("rxchain", (char *)&ant_val, 4, iovbuf, sizeof(iovbuf));
-	ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+	ret = dhd_iovar(dhd, 0, "rxchain", (char *)&ant_val, sizeof(ant_val), NULL, 0, TRUE);
 	if (ret) {
 		DHD_ERROR(("[WIFI_SEC] %s: Fail to execute dhd_wl_ioctl_cmd(): rxchain, ret=%d\n",
 			__FUNCTION__, ret));
@@ -1469,24 +1456,24 @@ int sec_get_param_wfa_cert(dhd_pub_t *dhd, int mode, uint* read_val)
 
 	switch (mode) {
 		case SET_PARAM_BUS_TXGLOM_MODE:
-			filepath = PLATFORM_PATH".bustxglom.info";
+			filepath = "/data/.bustxglom.info";
 			break;
 		case SET_PARAM_ROAMOFF:
-			filepath = PLATFORM_PATH".roamoff.info";
+			filepath = "/data/.roamoff.info";
 			break;
 #ifdef USE_WL_FRAMEBURST
 		case SET_PARAM_FRAMEBURST:
-			filepath = PLATFORM_PATH".frameburst.info";
+			filepath = "/data/.frameburst.info";
 			break;
 #endif /* USE_WL_FRAMEBURST */
 #ifdef USE_WL_TXBF
 		case SET_PARAM_TXBF:
-			filepath = PLATFORM_PATH".txbf.info";
+			filepath = "/data/.txbf.info";
 			break;
 #endif /* USE_WL_TXBF */
 #ifdef PROP_TXSTATUS
 		case SET_PARAM_PROPTX:
-			filepath = PLATFORM_PATH".proptx.info";
+			filepath = "/data/.proptx.info";
 			break;
 #endif /* PROP_TXSTATUS */
 		default:
@@ -1502,7 +1489,7 @@ int sec_get_param_wfa_cert(dhd_pub_t *dhd, int mode, uint* read_val)
 		return BCME_ERROR;
 	} else {
 		if (kernel_read(fp, fp->f_pos, (char *)&val, 4) < 0) {
-		filp_close(fp, NULL);
+			filp_close(fp, NULL);
 			/* File operation is failed so we will return error code */
 			DHD_ERROR(("[WIFI_SEC] %s: read failed, file path=%s\n",
 				__FUNCTION__, filepath));
@@ -1677,4 +1664,36 @@ static int __init get_hw_rev(char *arg)
 
 early_param("androidboot.hw_rev", get_hw_rev);
 #endif /* SUPPORT_MULTIPLE_BOARD_REV_FROM_HW */
+
+#ifdef BCM4335_XTAL_WAR
+bool
+check_bcm4335_rev(void)
+{
+	int ret = -1;
+	struct file *fp = NULL;
+	char *filepath = "/data/.rev";
+	char chip_rev[10] = {0, };
+	bool is_revb0 = TRUE;
+
+	DHD_ERROR(("check BCM4335, check_bcm4335_rev \n"));
+	fp = filp_open(filepath, O_RDONLY, 0);
+
+	if (IS_ERR(fp)) {
+		DHD_ERROR(("/data/.rev file open error\n"));
+		is_revb0 = TRUE;
+	} else {
+		DHD_ERROR(("/data/.rev file Found\n"));
+		ret = kernel_read(fp, 0, (char *)chip_rev, 9);
+		if (ret != -1 && NULL != strstr(chip_rev, "BCM4335B0")) {
+			DHD_ERROR(("Found BCM4335B0\n"));
+			is_revb0 = TRUE;
+		} else {
+			is_revb0 = FALSE;
+		}
+		filp_close(fp, NULL);
+	}
+	return is_revb0;
+}
+#endif /* BCM4335_XTAL_WAR */
+
 #endif /* CUSTOMER_HW4 */
