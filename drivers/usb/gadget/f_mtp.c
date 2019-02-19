@@ -36,7 +36,7 @@
 #include <linux/usb/ch9.h>
 #include <linux/usb/f_mtp.h>
 
-#define MTP_BULK_BUFFER_SIZE       131072
+#define MTP_BULK_BUFFER_SIZE       16384
 #define INTR_BUFFER_SIZE           28
 
 /* String IDs */
