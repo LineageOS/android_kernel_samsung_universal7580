@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 3.10.61 Kernel Configuration
+# Linux/arm64 3.10.108 Kernel Configuration
 #
 CONFIG_ARM64=y
 CONFIG_64BIT=y
@@ -1072,7 +1072,7 @@ CONFIG_BLK_DEV_RAM_SIZE=16384
 # CONFIG_LATTICE_ECP3_CONFIG is not set
 # CONFIG_SRAM is not set
 # CONFIG_SAMSUNG_JACK is not set
-CONFIG_UID_CPUTIME=y
+CONFIG_UID_SYS_STATS=y
 # CONFIG_C2PORT is not set
 
 #
