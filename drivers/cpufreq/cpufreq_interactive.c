@@ -477,7 +477,9 @@ static void cpufreq_interactive_timer(unsigned long data)
 	spin_lock_irqsave(&speedchange_cpumask_lock, flags);
 	cpumask_set_cpu(data, &speedchange_cpumask);
 	spin_unlock_irqrestore(&speedchange_cpumask_lock, flags);
-	wake_up_process_no_notif(tunables->speedchange_task);
+
+	if (tunables->speedchange_task)
+	    wake_up_process_no_notif(tunables->speedchange_task);
 
 rearm:
 	if (!timer_pending(&pcpu->cpu_timer))
