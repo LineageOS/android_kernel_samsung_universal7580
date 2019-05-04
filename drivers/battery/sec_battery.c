@@ -2877,8 +2877,14 @@ static void sec_bat_calculate_safety_time(struct sec_battery_info *battery)
 	pr_info("%s : EXPIRED_TIME(%ld), IP(%d), CP(%d), CURR(%d), STANDARD(%d)\n",
 		__func__, expired_time, input_power, charging_power, curr, battery->pdata->standard_curr);
 
-	if (curr == 0)
+	/* We don't need to calculate the safety timer if charge current is 0 */
+	if (curr == 0) {
+		/* Update the prev_safety_time if the expired_time is still max */
+		if(battery->expired_time == battery->pdata->expired_time) {
+			battery->prev_safety_time = ts.tv_sec;
+		}
 		return;
+	}
 
 	expired_time = (expired_time * battery->pdata->standard_curr) / curr;
 
