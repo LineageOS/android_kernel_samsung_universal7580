@@ -137,26 +137,6 @@
 		};
 	};
 
-	i2c@20 {
-		touchkey2@21 {
-			compatible = "abov,mc96ft16xx";
-			status = "okay";
-			pinctrl-names = "on_irq","off_irq","sub_det";
-			pinctrl-0 = <&cfg_irq>;
-			pinctrl-1 = <&cfg_input>;
-			pinctrl-2 = <&sub_det>;
-			reg = <0x21>;
-			interrupts = <0 0 0>;
-			interrupt-parent = <&gpa0>;
-			abov,sda-gpio = <&gpd2 1 0>;
-			abov,scl-gpio = <&gpd2 0 0>;
-			abov,irq-gpio = <&gpa0 3 1>;
-			abov,sub-det = <&gpa1 7 0>;
-			abov,fw_path = "abov/abov_ft1604_a7.fw";
-			abov,boot-on-ldo = "true";
-		};
-	};
-
 	hsi2c@13890000 {
 		status = "okay";
 		clock-frequency = <400000>;
