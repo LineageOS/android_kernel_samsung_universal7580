@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "d01b2c37_8f290631",
+        "filename": "arch/arm64/configs/lineageos_a7xelte_defconfig",
+        "patchSetId": 2
+      },
+      "lineNbr": 3407,
+      "author": {
+        "id": 19057
+      },
+      "writtenOn": "2020-07-07T07:44:57Z",
+      "side": 1,
+      "message": "This should be:\nCONFIG_BATTERY_AGE_FORECAST\u003dy\n\nYour DTS has the battery age forcasting as does our driver (the latest a7xelte kernel from Samsung is quite old)",
+      "revId": "2498d80287144784761af5a2fbc66515e6fb391b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
