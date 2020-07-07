@@ -16,6 +16,24 @@
       "revId": "2498d80287144784761af5a2fbc66515e6fb391b",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5a23877d_4599c5db",
+        "filename": "arch/arm64/configs/lineageos_a7xelte_defconfig",
+        "patchSetId": 2
+      },
+      "lineNbr": 3407,
+      "author": {
+        "id": 26587
+      },
+      "writtenOn": "2020-07-07T13:00:58Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "d01b2c37_8f290631",
+      "revId": "2498d80287144784761af5a2fbc66515e6fb391b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
