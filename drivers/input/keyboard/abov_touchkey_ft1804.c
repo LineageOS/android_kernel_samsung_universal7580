@@ -1760,13 +1760,17 @@ static int abov_tk_fw_update(struct abov_tk_info *info, u8 cmd)
 	usleep_range(5 * 1000, 5 * 1000);
 	tk_debug_info(true, &info->client->dev, "%s fw_mode_cmd sended\n", __func__);
 
-	if(abov_tk_fw_mode_check(info) != 1)
-	{
-		pr_err("%s: err, flash mode is not: %d\n", __func__, ret);
-		return 0;
+	if (is_ft1604_chip) {
+	    tk_debug_info(true, &info->client->dev, "%s ft1604: skipping abov_tk_fw_mode_check() and abov_tk_flash_erase()\n", __func__);
+    } else {
+	    if(abov_tk_fw_mode_check(info) != 1)
+	    {
+		    pr_err("%s: err, flash mode is not: %d\n", __func__, ret);
+		    return 0;
+	    }
+	    ret = abov_tk_flash_erase(info);
 	}
 
-	ret = abov_tk_flash_erase(info);
 	msleep(1300);
 	tk_debug_info(true, &info->client->dev, "%s fw_write start\n", __func__);
 
@@ -3030,9 +3034,15 @@ static int __init get_bootloader(char *bootloader)
 {
 	is_ft1604_chip = false;
 
-	if (strstr(bootloader, "A510M") || strstr(bootloader, "A510Y")) {
+	if (strstr(bootloader, "A510M")) {
 		is_ft1604_chip = true;
 		fw_path = "abov/abov_ft1604_a5_ltn.fw";
+	}
+	else if (strstr(bootloader, "A510Y") || strstr(bootloader, "A510K") ||
+			strstr(bootloader, "A510L") || strstr(bootloader, "A510S") ||
+			strstr(bootloader, "A5108")) {
+		is_ft1604_chip = true;
+		fw_path = "abov/abov_ft1604_a5.fw";
 	}
 	else if (strstr(bootloader, "A310N0") || strstr(bootloader, "A310M")) {
 		is_ft1604_chip = true;
