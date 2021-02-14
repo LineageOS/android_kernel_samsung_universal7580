@@ -14,7 +14,7 @@
 #include "exynos7580.dtsi"
 #include "modem-carmen2-pdata.dtsi"
 #include "exynos7580-gvwifi_gpio_00.dtsi"
-#include "exynos7580-gvlte_battery_01.dtsi"
+#include "exynos7580-gvwifi_battery_01.dtsi"
 
 / {
 	model = "Samsung GVLTE revision 00 board based on EXYNOS7580";
