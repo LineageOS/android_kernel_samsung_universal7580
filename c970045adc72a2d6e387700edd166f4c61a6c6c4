@@ -1,0 +1,73 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "53f8a2bd_31d34b9b",
+        "filename": "drivers/input/keyboard/abov_touchkey_ft1804.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1764,
+      "author": {
+        "id": 17401
+      },
+      "writtenOn": "2021-02-16T10:39:35Z",
+      "side": 1,
+      "message": "mix of spaces and tabs (below too)",
+      "range": {
+        "startLine": 1764,
+        "startChar": 0,
+        "endLine": 1764,
+        "endChar": 5
+      },
+      "revId": "c970045adc72a2d6e387700edd166f4c61a6c6c4",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "01f8a107_56a4be0e",
+        "filename": "drivers/input/keyboard/abov_touchkey_ft1804.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1765,
+      "author": {
+        "id": 17401
+      },
+      "writtenOn": "2021-02-16T10:39:35Z",
+      "side": 1,
+      "message": "indentation",
+      "range": {
+        "startLine": 1765,
+        "startChar": 0,
+        "endLine": 1765,
+        "endChar": 4
+      },
+      "revId": "c970045adc72a2d6e387700edd166f4c61a6c6c4",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "99e99e62_fa07de71",
+        "filename": "drivers/input/keyboard/abov_touchkey_ft1804.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1767,
+      "author": {
+        "id": 17401
+      },
+      "writtenOn": "2021-02-16T10:39:35Z",
+      "side": 1,
+      "message": "if (abov_tk_fw_mode_check(info) !\u003d 1) {",
+      "range": {
+        "startLine": 1766,
+        "startChar": 5,
+        "endLine": 1767,
+        "endChar": 6
+      },
+      "revId": "c970045adc72a2d6e387700edd166f4c61a6c6c4",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
