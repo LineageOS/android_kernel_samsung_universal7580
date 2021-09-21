@@ -126,6 +126,8 @@ static enum power_supply_property sec_battery_props[] = {
 
 static enum power_supply_property sec_power_props[] = {
 	POWER_SUPPLY_PROP_ONLINE,
+	POWER_SUPPLY_PROP_CURRENT_MAX,
+	POWER_SUPPLY_PROP_VOLTAGE_MAX,
 };
 
 static enum power_supply_property sec_ps_props[] = {
@@ -4784,6 +4786,18 @@ static int sec_usb_get_property(struct power_supply *psy,
 	struct sec_battery_info *battery =
 		container_of(psy, struct sec_battery_info, psy_usb);
 
+    /* Report the max current in uA */
+    if(psp == POWER_SUPPLY_PROP_CURRENT_MAX) {
+        val->intval = battery->current_max * 1000;
+        return 0;
+    }
+
+    /* Report the input voltage in uV */
+    if(psp == POWER_SUPPLY_PROP_VOLTAGE_MAX) {
+        val->intval = battery->input_voltage * 1000000;
+        return 0;
+    }
+
 	if (psp != POWER_SUPPLY_PROP_ONLINE)
 		return -EINVAL;
 
@@ -4818,6 +4832,18 @@ static int sec_ac_get_property(struct power_supply *psy,
 {
 	struct sec_battery_info *battery =
 		container_of(psy, struct sec_battery_info, psy_ac);
+
+    /* Report the max current in uA */
+    if(psp == POWER_SUPPLY_PROP_CURRENT_MAX) {
+        val->intval = battery->current_max * 1000;
+        return 0;
+    }
+
+    /* Report the input voltage in uV */
+    if(psp == POWER_SUPPLY_PROP_VOLTAGE_MAX) {
+        val->intval = battery->input_voltage * 1000000;
+        return 0;
+    }
 
 	if (psp != POWER_SUPPLY_PROP_ONLINE)
 		return -EINVAL;
@@ -4866,6 +4892,18 @@ static int sec_wireless_get_property(struct power_supply *psy,
 {
 	struct sec_battery_info *battery =
 		container_of(psy, struct sec_battery_info, psy_wireless);
+
+    /* Report the max current in uA */
+    if(psp == POWER_SUPPLY_PROP_CURRENT_MAX) {
+        val->intval = battery->current_max * 1000;
+        return 0;
+    }
+
+    /* Report the input voltage in uV */
+    if(psp == POWER_SUPPLY_PROP_VOLTAGE_MAX) {
+        val->intval = battery->input_voltage * 1000000;
+        return 0;
+    }
 
 	if (psp != POWER_SUPPLY_PROP_ONLINE)
 		return -EINVAL;
