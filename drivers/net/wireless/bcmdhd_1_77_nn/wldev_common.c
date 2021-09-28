@@ -481,6 +481,12 @@ int wldev_set_country(
 	if (!country_code)
 		return error;
 
+	/* Force country code to XZ if country code is SY (matches a5xelte firmware) */
+	if((country_code[0] == 'S') && (country_code[1] == 'Y')) {
+        country_code[0] = 'X';
+        country_code[1] = 'Z';
+	}
+
 	bzero(&scbval, sizeof(scb_val_t));
 	error = wldev_iovar_getbuf(dev, "country", NULL, 0, &cur_cspec, sizeof(wl_country_t), NULL);
 	if (error < 0) {
